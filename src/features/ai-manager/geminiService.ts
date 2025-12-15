@@ -87,7 +87,8 @@ export const sendMentorMessage = async (
   message: string,
   history: {role: 'user' | 'model', text: string}[],
   creatorId?: string,
-  includeStats?: boolean
+  includeStats?: boolean,
+  userName?: string
 ) => {
   if (!apiKey) {
     return "API Key is missing. Please check your environment configuration.";
@@ -109,7 +110,7 @@ export const sendMentorMessage = async (
       enhancedMessage = await injectStatsContext(message, creatorId);
     }
 
-    // Build messages array for OpenAI
+    // Build messages array for Gemini
     const messages = [
       ...history.map(h => ({
         role: h.role === 'user' ? 'user' : 'assistant',
@@ -128,7 +129,8 @@ export const sendMentorMessage = async (
       body: JSON.stringify({
         messages: messages,
         systemInstruction: systemInstruction,
-        apiKey: apiKey
+        apiKey: apiKey,
+        userName: userName
       })
     });
 
@@ -280,7 +282,8 @@ export const sendStudentMentorMessage = async (
   message: string,
   history: {role: 'user' | 'model', text: string}[],
   studentId: string,
-  courseId: string
+  courseId: string,
+  userName?: string
 ) => {
   if (!apiKey) {
     return "API Key is missing. Please check your environment configuration.";
@@ -348,7 +351,8 @@ export const sendStudentMentorMessage = async (
       body: JSON.stringify({
         messages: messages,
         systemInstruction: systemInstruction,
-        apiKey: apiKey
+        apiKey: apiKey,
+        userName: userName
       })
     });
 

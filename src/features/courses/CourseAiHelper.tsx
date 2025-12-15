@@ -15,7 +15,7 @@ const CourseAiHelper: React.FC<CourseAiHelperProps> = ({
   currentLesson,
   currentModule,
 }) => {
-  const { user } = useAuth();
+  const { user, profile } = useAuth();
   const [isOpen, setIsOpen] = useState(false);
   const [messages, setMessages] = useState<AIMessage[]>([
     {
@@ -49,8 +49,8 @@ const CourseAiHelper: React.FC<CourseAiHelperProps> = ({
       // Convert messages to API format
       const historyForApi = messages.map((m) => ({ role: m.role, text: m.text }));
 
-      // Call AI service with student-specific context (course progress, creator prompt)
-      const response = await sendStudentMentorMessage(originalInput, historyForApi, user.id, courseId);
+      // Call AI service with student-specific context (course progress, creator prompt, user name)
+      const response = await sendStudentMentorMessage(originalInput, historyForApi, user.id, courseId, profile?.full_name);
 
       const aiMsg: AIMessage = {
         role: 'model',

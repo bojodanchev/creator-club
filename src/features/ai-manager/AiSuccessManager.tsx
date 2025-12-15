@@ -8,7 +8,7 @@ import { recalculateAllStudentHealth, getStudentHealthReport } from './studentHe
 import { useAuth } from '../../core/contexts/AuthContext';
 
 const AiSuccessManager: React.FC = () => {
-  const { user } = useAuth();
+  const { user, profile } = useAuth();
   const [activeTab, setActiveTab] = useState<'chat' | 'report'>('chat');
 
   // Chat State
@@ -119,12 +119,13 @@ const AiSuccessManager: React.FC = () => {
 
     const historyForApi = messages.map(m => ({ role: m.role, text: m.text }));
 
-    // Call enhanced sendMentorMessage with creatorId and includeStats
+    // Call enhanced sendMentorMessage with creatorId, includeStats, and userName
     const response = await sendMentorMessage(
       contextMessage,
       historyForApi,
       user.id, // Pass creatorId for personalization
-      isStatsCommand // Include stats if /stats command or overview/dashboard keywords detected
+      isStatsCommand, // Include stats if /stats command or overview/dashboard keywords detected
+      profile?.full_name // Pass user's name for personalized responses
     );
 
     const aiMsg: AIMessage = { role: 'model', text: response || "I encountered an error.", timestamp: new Date() };
