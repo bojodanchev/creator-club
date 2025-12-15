@@ -3,6 +3,7 @@ import { MessageCircle, Send, X, Bot, User, Loader2 } from 'lucide-react';
 import { sendStudentMentorMessage } from '../ai-manager/geminiService';
 import { AIMessage } from '../../core/types';
 import { useAuth } from '../../core/contexts/AuthContext';
+import AiResponseText from '../../components/ui/AiResponseText';
 
 interface CourseAiHelperProps {
   courseId: string;
@@ -119,13 +120,17 @@ const CourseAiHelper: React.FC<CourseAiHelperProps> = ({
                   {msg.role === 'model' ? <Bot size={18} /> : <User size={18} />}
                 </div>
                 <div
-                  className={`max-w-[75%] p-3 rounded-2xl ${
+                  className={`max-w-[80%] p-3 rounded-2xl ${
                     msg.role === 'model'
-                      ? 'bg-slate-50 text-slate-800 rounded-tl-none border border-slate-200'
+                      ? 'bg-white text-slate-800 rounded-tl-none border border-slate-200 shadow-sm'
                       : 'bg-indigo-600 text-white rounded-tr-none'
                   }`}
                 >
-                  <p className="text-sm leading-relaxed whitespace-pre-wrap">{msg.text}</p>
+                  {msg.role === 'model' ? (
+                    <AiResponseText text={msg.text} />
+                  ) : (
+                    <p className="text-sm leading-relaxed">{msg.text}</p>
+                  )}
                 </div>
               </div>
             ))}

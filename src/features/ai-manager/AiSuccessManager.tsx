@@ -1,11 +1,11 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { Send, Bot, User, Sparkles, AlertTriangle, FileText, Loader2, RefreshCw } from 'lucide-react';
-import ReactMarkdown from 'react-markdown';
 import { sendMentorMessage, analyzeStudentRisks } from './geminiService';
 import { AIMessage, Student, RiskLevel } from '../../core/types';
 import { getAtRiskStudents, AtRiskStudent } from '../dashboard/dashboardService';
 import { recalculateAllStudentHealth, getStudentHealthReport } from './studentHealthService';
 import { useAuth } from '../../core/contexts/AuthContext';
+import AiResponseText from '../../components/ui/AiResponseText';
 
 const AiSuccessManager: React.FC = () => {
   const { user, profile } = useAuth();
@@ -225,7 +225,11 @@ const AiSuccessManager: React.FC = () => {
                     {msg.role === 'model' ? <Bot size={18} /> : <User size={18} />}
                   </div>
                   <div className={`max-w-[70%] p-4 rounded-2xl ${msg.role === 'model' ? 'bg-slate-50 text-slate-800 rounded-tl-none' : 'bg-indigo-600 text-white rounded-tr-none'}`}>
-                    <p className="text-sm leading-relaxed whitespace-pre-wrap">{msg.text}</p>
+                    {msg.role === 'model' ? (
+                      <AiResponseText text={msg.text} />
+                    ) : (
+                      <p className="text-sm leading-relaxed">{msg.text}</p>
+                    )}
                   </div>
                 </div>
               ))}
