@@ -367,8 +367,8 @@ const AiSuccessManager: React.FC = () => {
                  <h2 className="text-xl font-bold text-slate-900">Analysis Results</h2>
                  <button onClick={() => setReport(null)} className="text-sm text-indigo-600 font-medium hover:underline">Run New Analysis</button>
               </div>
-              <div className="prose prose-slate max-w-none bg-slate-50 p-6 rounded-xl border border-slate-100">
-                <ReactMarkdown>{report}</ReactMarkdown>
+              <div className="bg-slate-50 p-6 rounded-xl border border-slate-100">
+                <AiResponseText text={report} className="text-slate-800" />
               </div>
             </div>
           )}
