@@ -90,44 +90,88 @@ export async function getCreatorEvents(creatorId: string): Promise<EventWithDeta
 }
 
 export async function getUpcomingEvents(userId: string): Promise<EventWithDetails[]> {
-  // Get events the user is attending
-  const { data: attendances, error: attendanceError } = await supabase
-    .from('event_attendees')
-    .select(`
-      *,
-      event:events(*)
-    `)
-    .eq('user_id', userId)
-    .eq('status', 'attending');
+  // First, get all creators the student is enrolled with (via enrollments)
+  const { data: enrollments, error: enrollmentError } = await supabase
+    .from('enrollments')
+    .select('course:courses(creator_id)')
+    .eq('user_id', userId);
 
-  if (attendanceError) {
-    console.error('Error fetching user events:', attendanceError);
+  if (enrollmentError) {
+    console.error('Error fetching enrollments:', enrollmentError);
+  }
+
+  // Extract unique creator IDs from enrollments
+  const creatorIds = new Set<string>();
+  for (const enrollment of enrollments || []) {
+    const course = enrollment.course as { creator_id: string } | null;
+    if (course?.creator_id) {
+      creatorIds.add(course.creator_id);
+    }
+  }
+
+  // Also check community memberships to get creators
+  const { data: memberships, error: membershipError } = await supabase
+    .from('community_members')
+    .select('community:communities(creator_id)')
+    .eq('user_id', userId);
+
+  if (membershipError) {
+    console.error('Error fetching memberships:', membershipError);
+  }
+
+  for (const membership of memberships || []) {
+    const community = membership.community as { creator_id: string } | null;
+    if (community?.creator_id) {
+      creatorIds.add(community.creator_id);
+    }
+  }
+
+  // If no creators found, return empty
+  if (creatorIds.size === 0) {
     return [];
   }
 
+  // Get all upcoming events from these creators
   const now = new Date().toISOString();
+  const { data: allEvents, error: eventsError } = await supabase
+    .from('events')
+    .select('*')
+    .in('creator_id', Array.from(creatorIds))
+    .gte('start_time', now)
+    .order('start_time', { ascending: true });
+
+  if (eventsError) {
+    console.error('Error fetching events:', eventsError);
+    return [];
+  }
+
+  // Get user's RSVP status for each event and attendee counts
   const events: EventWithDetails[] = [];
 
-  for (const attendance of attendances || []) {
-    const event = attendance.event as DbEvent;
-    if (!event || event.start_time < now) continue;
-
+  for (const event of allEvents || []) {
+    // Get attendee count
     const { count } = await supabase
       .from('event_attendees')
       .select('id', { count: 'exact' })
       .eq('event_id', event.id)
       .eq('status', 'attending');
 
+    // Get user's RSVP status
+    const { data: attendance } = await supabase
+      .from('event_attendees')
+      .select('status')
+      .eq('event_id', event.id)
+      .eq('user_id', userId)
+      .single();
+
     events.push({
       ...event,
       attendee_count: count || 0,
-      user_status: attendance.status as AttendeeStatus,
+      user_status: attendance?.status as AttendeeStatus | null,
     });
   }
 
-  return events.sort((a, b) =>
-    new Date(a.start_time).getTime() - new Date(b.start_time).getTime()
-  );
+  return events;
 }
 
 export async function getEventById(eventId: string, userId?: string): Promise<EventWithDetails | null> {
