@@ -37,6 +37,11 @@ const AiSuccessManager: React.FC = () => {
   const [showConversationHistory, setShowConversationHistory] = useState(false);
   const [conversationHistory, setConversationHistory] = useState<AIConversation[]>([]);
 
+  // Ref to track if component is mounted (prevents state updates after unmount)
+  const isMountedRef = useRef(true);
+  // Ref to track current save operation version (prevents race conditions)
+  const saveVersionRef = useRef(0);
+
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   };
@@ -44,6 +49,14 @@ const AiSuccessManager: React.FC = () => {
   useEffect(() => {
     scrollToBottom();
   }, [messages]);
+
+  // Track component mounted state for cleanup
+  useEffect(() => {
+    isMountedRef.current = true;
+    return () => {
+      isMountedRef.current = false;
+    };
+  }, []);
 
   // Load students on mount and when filter changes
   useEffect(() => {
@@ -77,11 +90,18 @@ const AiSuccessManager: React.FC = () => {
     }
   }, [user]);
 
-  // Auto-save conversation after messages change (debounced)
+  // Auto-save conversation after messages change (debounced with race condition protection)
   useEffect(() => {
     if (!user || messages.length <= 1) return;
 
+    // Increment version to track this save operation
+    const currentVersion = ++saveVersionRef.current;
+
     const saveCurrentConversation = async () => {
+      // Check if this is still the latest save operation
+      if (currentVersion !== saveVersionRef.current) return;
+      if (!isMountedRef.current) return;
+
       setIsSavingConversation(true);
 
       // Convert AIMessage[] to AIMessageRecord[]
@@ -99,11 +119,13 @@ const AiSuccessManager: React.FC = () => {
         currentConversation?.id
       );
 
-      if (saved && !currentConversation) {
-        setCurrentConversation(saved);
+      // Only update state if still mounted and this is still the latest operation
+      if (isMountedRef.current && currentVersion === saveVersionRef.current) {
+        if (saved && !currentConversation) {
+          setCurrentConversation(saved);
+        }
+        setIsSavingConversation(false);
       }
-
-      setIsSavingConversation(false);
     };
 
     // Debounce saving by 2 seconds

@@ -52,6 +52,7 @@ export async function saveConversation(
     user_id: userId,
     context_type: contextType,
     context_id: contextId || null,
+    title: title,
     messages: messages,
     tokens_used: tokensUsed,
   };
