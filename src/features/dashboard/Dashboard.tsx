@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { ResponsiveContainer, AreaChart, Area, XAxis, YAxis, Tooltip, CartesianGrid } from 'recharts';
-import { AlertTriangle, TrendingUp, Users, DollarSign, ArrowUpRight, ArrowDownRight, Loader2, X, Mail, BookOpen, Calendar } from 'lucide-react';
+import { AlertTriangle, TrendingUp, Users, DollarSign, ArrowUpRight, ArrowDownRight, Loader2, X, Mail, BookOpen, Calendar, Plus, MessageSquare, Sparkles } from 'lucide-react';
 import { useAuth } from '../../core/contexts/AuthContext';
 import {
   getDashboardStats,
@@ -11,6 +11,8 @@ import {
   ActivityDataPoint,
 } from './dashboardService';
 import TasksPanel from './TasksPanel';
+import { getCreatorCommunities, createCommunity, seedDefaultChannels, joinCommunity } from '../community/communityService';
+import { DbCommunity } from '../../core/supabase/database.types';
 
 const StatCard = ({ title, value, change, icon: Icon, color, isPositive = true }: {
   title: string;
@@ -57,11 +59,43 @@ const Dashboard: React.FC = () => {
   const [atRiskStudents, setAtRiskStudents] = useState<AtRiskStudent[]>([]);
   const [activityData, setActivityData] = useState<ActivityDataPoint[]>([]);
 
+  // Onboarding state
+  const [hasCommunity, setHasCommunity] = useState<boolean | null>(null);
+  const [showCreateCommunityModal, setShowCreateCommunityModal] = useState(false);
+  const [newCommunityName, setNewCommunityName] = useState('');
+  const [creatingCommunity, setCreatingCommunity] = useState(false);
+
   useEffect(() => {
     if (user?.id) {
       loadDashboardData();
+      checkCreatorCommunity();
     }
   }, [user?.id]);
+
+  const checkCreatorCommunity = async () => {
+    if (!user?.id) return;
+    const communities = await getCreatorCommunities(user.id);
+    setHasCommunity(communities.length > 0);
+  };
+
+  const handleCreateCommunity = async () => {
+    if (!user?.id || !newCommunityName.trim()) return;
+
+    setCreatingCommunity(true);
+    try {
+      const community = await createCommunity(user.id, newCommunityName.trim());
+      if (community) {
+        await seedDefaultChannels(community.id);
+        await joinCommunity(user.id, community.id, 'admin');
+        setHasCommunity(true);
+        setShowCreateCommunityModal(false);
+        setNewCommunityName('');
+        showToast('Community created! Head to the Community tab to customize it.');
+      }
+    } finally {
+      setCreatingCommunity(false);
+    }
+  };
 
   const showToast = (message: string) => {
     setToastMessage(message);
@@ -110,6 +144,61 @@ const Dashboard: React.FC = () => {
           Generate Report
         </button>
       </div>
+
+      {/* Onboarding Banner for new creators without a community */}
+      {hasCommunity === false && (
+        <div className="bg-gradient-to-r from-indigo-500 via-purple-500 to-pink-500 rounded-xl p-6 text-white shadow-lg">
+          <div className="flex items-start gap-4">
+            <div className="bg-white/20 p-3 rounded-lg">
+              <Sparkles className="w-8 h-8" />
+            </div>
+            <div className="flex-1">
+              <h2 className="text-xl font-bold mb-2">Welcome to Creator Club!</h2>
+              <p className="text-white/90 mb-4">
+                Get started by creating your community. This is where your students will connect, share wins, and engage with your content.
+              </p>
+              <div className="flex flex-wrap gap-3">
+                <button
+                  onClick={() => setShowCreateCommunityModal(true)}
+                  className="bg-white text-indigo-600 px-5 py-2.5 rounded-lg font-semibold hover:bg-white/90 transition-colors flex items-center gap-2"
+                >
+                  <Plus size={18} />
+                  Create Your Community
+                </button>
+              </div>
+            </div>
+          </div>
+          <div className="mt-6 grid grid-cols-1 md:grid-cols-3 gap-4">
+            <div className="bg-white/10 rounded-lg p-4 flex items-start gap-3">
+              <div className="bg-white/20 p-2 rounded-lg">
+                <MessageSquare size={20} />
+              </div>
+              <div>
+                <h3 className="font-semibold">Community Hub</h3>
+                <p className="text-sm text-white/80">Engage with students in channels</p>
+              </div>
+            </div>
+            <div className="bg-white/10 rounded-lg p-4 flex items-start gap-3">
+              <div className="bg-white/20 p-2 rounded-lg">
+                <BookOpen size={20} />
+              </div>
+              <div>
+                <h3 className="font-semibold">Course Content</h3>
+                <p className="text-sm text-white/80">Create courses and modules</p>
+              </div>
+            </div>
+            <div className="bg-white/10 rounded-lg p-4 flex items-start gap-3">
+              <div className="bg-white/20 p-2 rounded-lg">
+                <Calendar size={20} />
+              </div>
+              <div>
+                <h3 className="font-semibold">Events & Calls</h3>
+                <p className="text-sm text-white/80">Schedule live sessions</p>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Stats Grid */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
@@ -381,6 +470,71 @@ const Dashboard: React.FC = () => {
                     <Mail size={16} />
                   )}
                   Send Message
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Create Community Modal */}
+      {showCreateCommunityModal && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-xl w-full max-w-md overflow-hidden">
+            <div className="bg-gradient-to-r from-indigo-500 to-purple-500 p-6 text-white">
+              <h3 className="text-xl font-bold">Create Your Community</h3>
+              <p className="text-white/80 text-sm mt-1">This is where your students will connect and engage</p>
+            </div>
+            <div className="p-6 space-y-4">
+              <div>
+                <label className="block text-sm font-medium text-slate-700 mb-2">Community Name</label>
+                <input
+                  type="text"
+                  value={newCommunityName}
+                  onChange={(e) => setNewCommunityName(e.target.value)}
+                  placeholder="e.g., My Awesome Community"
+                  className="w-full px-4 py-3 border border-slate-200 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
+                  autoFocus
+                />
+                <p className="text-xs text-slate-500 mt-2">
+                  You can always change this later in settings
+                </p>
+              </div>
+              <div className="bg-slate-50 rounded-lg p-4">
+                <h4 className="text-sm font-medium text-slate-700 mb-2">What you'll get:</h4>
+                <ul className="text-sm text-slate-600 space-y-1">
+                  <li className="flex items-center gap-2">
+                    <span className="text-emerald-500">✓</span> Default channels (General, Wins, Help, Announcements, Introductions)
+                  </li>
+                  <li className="flex items-center gap-2">
+                    <span className="text-emerald-500">✓</span> Gamification with points & leaderboard
+                  </li>
+                  <li className="flex items-center gap-2">
+                    <span className="text-emerald-500">✓</span> Post, comment, and like features
+                  </li>
+                </ul>
+              </div>
+              <div className="flex gap-3 pt-2">
+                <button
+                  onClick={() => {
+                    setShowCreateCommunityModal(false);
+                    setNewCommunityName('');
+                  }}
+                  className="flex-1 py-2.5 px-4 border border-slate-200 rounded-lg text-slate-600 hover:bg-slate-50 transition-colors"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={handleCreateCommunity}
+                  disabled={!newCommunityName.trim() || creatingCommunity}
+                  className="flex-1 bg-indigo-600 text-white py-2.5 px-4 rounded-lg flex items-center justify-center gap-2 hover:bg-indigo-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  {creatingCommunity ? (
+                    <Loader2 size={18} className="animate-spin" />
+                  ) : (
+                    <Plus size={18} />
+                  )}
+                  Create Community
                 </button>
               </div>
             </div>

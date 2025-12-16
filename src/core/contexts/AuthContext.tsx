@@ -121,6 +121,11 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   const signUp = async (email: string, password: string, fullName: string, role: UserRole) => {
     try {
+      // Determine the redirect URL based on environment
+      const redirectUrl = import.meta.env.PROD
+        ? window.location.origin
+        : 'http://localhost:5173';
+
       // First, create the auth user
       const { data: authData, error: authError } = await supabase.auth.signUp({
         email,
@@ -130,6 +135,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
             full_name: fullName,
             role: role,
           },
+          emailRedirectTo: redirectUrl,
         },
       });
 

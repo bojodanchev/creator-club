@@ -83,17 +83,17 @@ const CommunityHub: React.FC = () => {
     try {
       let communityList: DbCommunity[] = [];
 
-      // Creators see their own communities
+      // Creators see ONLY their own communities (they need to create one first)
       if (role === 'creator' || role === 'superadmin') {
         communityList = await getCreatorCommunities(user.id);
       } else {
         // Students/members see communities they're part of
         communityList = await getMemberCommunities(user.id);
-      }
 
-      // If no communities, also try to get public ones
-      if (communityList.length === 0) {
-        communityList = await getCommunities();
+        // Only students can fall back to seeing public communities (to join)
+        if (communityList.length === 0) {
+          communityList = await getCommunities();
+        }
       }
 
       setCommunities(communityList);
