@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { PlayCircle, FileText, CheckCircle, ChevronRight, ChevronDown, Plus, GraduationCap, Loader2, BookOpen } from 'lucide-react';
+import { PlayCircle, FileText, CheckCircle, ChevronRight, ChevronDown, Plus, GraduationCap, Loader2, BookOpen, Pencil, BarChart3, ArrowUp, ArrowDown } from 'lucide-react';
 import { useAuth } from '../../core/contexts/AuthContext';
 import {
   getCreatorCourses,
@@ -11,11 +11,18 @@ import {
   markLessonComplete,
   markLessonIncomplete,
   formatDuration,
+  reorderModules,
+  reorderLessons,
   CourseWithModules,
+  ModuleWithLessons,
   LessonWithProgress,
 } from './courseService';
-import { DbCourse } from '../../core/supabase/database.types';
+import { DbCourse, DbModule, DbLesson } from '../../core/supabase/database.types';
 import CourseAiHelper from './CourseAiHelper';
+import CourseEditModal from './components/CourseEditModal';
+import ModuleEditModal from './components/ModuleEditModal';
+import LessonEditModal from './components/LessonEditModal';
+import CourseAnalyticsPanel from './components/CourseAnalyticsPanel';
 
 const CourseLMS: React.FC = () => {
   const { user, role } = useAuth();
@@ -34,6 +41,20 @@ const CourseLMS: React.FC = () => {
   const [showCreateCourse, setShowCreateCourse] = useState(false);
   const [newCourseName, setNewCourseName] = useState('');
   const [newCourseDescription, setNewCourseDescription] = useState('');
+
+  // Course editing modals
+  const [editingCourse, setEditingCourse] = useState<DbCourse | null>(null);
+  const [showAnalytics, setShowAnalytics] = useState<string | null>(null);
+
+  // Module editing
+  const [showModuleModal, setShowModuleModal] = useState(false);
+  const [editingModule, setEditingModule] = useState<DbModule | null>(null);
+  const [moduleForCourse, setModuleForCourse] = useState<string>('');
+
+  // Lesson editing
+  const [showLessonModal, setShowLessonModal] = useState(false);
+  const [editingLesson, setEditingLesson] = useState<DbLesson | null>(null);
+  const [lessonForModule, setLessonForModule] = useState<string>('');
 
   // Load courses on mount
   useEffect(() => {
@@ -139,6 +160,125 @@ const CourseLMS: React.FC = () => {
     } finally {
       setIsUpdating(false);
     }
+  };
+
+  // Course editing handlers
+  const handleCourseEditSave = async (updatedCourse: DbCourse) => {
+    setEditingCourse(null);
+    await loadCourses();
+  };
+
+  const handleCourseDelete = async () => {
+    setEditingCourse(null);
+    await loadCourses();
+  };
+
+  // Module handlers
+  const handleAddModule = (courseId: string) => {
+    setModuleForCourse(courseId);
+    setEditingModule(null);
+    setShowModuleModal(true);
+  };
+
+  const handleEditModule = (module: DbModule) => {
+    setModuleForCourse(module.course_id);
+    setEditingModule(module);
+    setShowModuleModal(true);
+  };
+
+  const handleModuleSave = async (savedModule: DbModule) => {
+    setShowModuleModal(false);
+    setEditingModule(null);
+    // Reload the selected course to get updated modules
+    if (selectedCourse) {
+      const updated = await getCourseWithDetails(selectedCourse.id, user?.id);
+      if (updated) setSelectedCourse(updated);
+    }
+  };
+
+  const handleModuleDelete = async () => {
+    setShowModuleModal(false);
+    setEditingModule(null);
+    if (selectedCourse) {
+      const updated = await getCourseWithDetails(selectedCourse.id, user?.id);
+      if (updated) setSelectedCourse(updated);
+    }
+  };
+
+  // Lesson handlers
+  const handleAddLesson = (moduleId: string) => {
+    setLessonForModule(moduleId);
+    setEditingLesson(null);
+    setShowLessonModal(true);
+  };
+
+  const handleEditLesson = (lesson: DbLesson) => {
+    setLessonForModule(lesson.module_id);
+    setEditingLesson(lesson);
+    setShowLessonModal(true);
+  };
+
+  const handleLessonSave = async (savedLesson: DbLesson) => {
+    setShowLessonModal(false);
+    setEditingLesson(null);
+    if (selectedCourse) {
+      const updated = await getCourseWithDetails(selectedCourse.id, user?.id);
+      if (updated) setSelectedCourse(updated);
+    }
+  };
+
+  const handleLessonDelete = async () => {
+    setShowLessonModal(false);
+    setEditingLesson(null);
+    setActiveLesson(null);
+    if (selectedCourse) {
+      const updated = await getCourseWithDetails(selectedCourse.id, user?.id);
+      if (updated) setSelectedCourse(updated);
+    }
+  };
+
+  // Reorder handlers
+  const handleMoveModule = async (moduleId: string, direction: 'up' | 'down') => {
+    if (!selectedCourse) return;
+    const modules = [...selectedCourse.modules];
+    const index = modules.findIndex(m => m.id === moduleId);
+    if (index === -1) return;
+    if (direction === 'up' && index === 0) return;
+    if (direction === 'down' && index === modules.length - 1) return;
+
+    const newIndex = direction === 'up' ? index - 1 : index + 1;
+    [modules[index], modules[newIndex]] = [modules[newIndex], modules[index]];
+
+    // Update positions
+    const moduleOrders = modules.map((m, i) => ({ id: m.id, position: i }));
+    await reorderModules(moduleOrders);
+
+    // Reload
+    const updated = await getCourseWithDetails(selectedCourse.id, user?.id);
+    if (updated) setSelectedCourse(updated);
+  };
+
+  const handleMoveLesson = async (lessonId: string, moduleId: string, direction: 'up' | 'down') => {
+    if (!selectedCourse) return;
+    const module = selectedCourse.modules.find(m => m.id === moduleId);
+    if (!module) return;
+
+    const lessons = [...module.lessons];
+    const index = lessons.findIndex(l => l.id === lessonId);
+    if (index === -1) return;
+    if (direction === 'up' && index === 0) return;
+    if (direction === 'down' && index === lessons.length - 1) return;
+
+    const newIndex = direction === 'up' ? index - 1 : index + 1;
+    [lessons[index], lessons[newIndex]] = [lessons[newIndex], lessons[index]];
+
+    // Update positions
+    const lessonOrders = lessons.map((l, i) => ({ id: l.id, position: i }));
+    await reorderLessons(lessonOrders);
+
+    // Reload
+    const updated = await getCourseWithDetails(selectedCourse.id, user?.id);
+    if (updated) setSelectedCourse(updated);
   };
 
   // Show loading state
@@ -298,13 +438,16 @@ const CourseLMS: React.FC = () => {
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
           {courses.map(course => {
             const totalLessons = course.modules.reduce((acc, m) => acc + m.lessons.length, 0);
+            const isCreator = role === 'creator' || role === 'superadmin';
             return (
               <div
                 key={course.id}
-                className="bg-white rounded-xl shadow-sm border border-slate-100 overflow-hidden cursor-pointer hover:shadow-md transition-shadow group"
-                onClick={() => handleSelectCourse(course)}
+                className="bg-white rounded-xl shadow-sm border border-slate-100 overflow-hidden hover:shadow-md transition-shadow group"
               >
-                <div className="relative h-48 overflow-hidden bg-gradient-to-br from-indigo-500 to-purple-600">
+                <div
+                  className="relative h-48 overflow-hidden bg-gradient-to-br from-indigo-500 to-purple-600 cursor-pointer"
+                  onClick={() => handleSelectCourse(course)}
+                >
                   {course.thumbnail_url ? (
                     <img src={course.thumbnail_url} alt={course.title} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300" />
                   ) : (
@@ -319,8 +462,33 @@ const CourseLMS: React.FC = () => {
                     </span>
                     <h3 className="font-bold text-lg">{course.title}</h3>
                   </div>
+                  {/* Creator action buttons */}
+                  {isCreator && (
+                    <div className="absolute top-3 right-3 flex gap-2">
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setEditingCourse(course);
+                        }}
+                        className="p-2 bg-white/90 hover:bg-white rounded-lg shadow-sm transition-colors"
+                        title="Edit course"
+                      >
+                        <Pencil size={16} className="text-slate-700" />
+                      </button>
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setShowAnalytics(course.id);
+                        }}
+                        className="p-2 bg-white/90 hover:bg-white rounded-lg shadow-sm transition-colors"
+                        title="View analytics"
+                      >
+                        <BarChart3 size={16} className="text-slate-700" />
+                      </button>
+                    </div>
+                  )}
                 </div>
-                <div className="p-4">
+                <div className="p-4 cursor-pointer" onClick={() => handleSelectCourse(course)}>
                   <p className="text-slate-600 text-sm line-clamp-2">{course.description || 'No description'}</p>
                   <div className="mt-4 pt-4 border-t border-slate-50 flex justify-between items-center">
                     <span className="text-xs text-slate-500">
@@ -465,61 +633,147 @@ const CourseLMS: React.FC = () => {
         </div>
 
         <div className="flex-1 py-2">
+          {/* Add Module Button for Creators */}
+          {(role === 'creator' || role === 'superadmin') && (
+            <button
+              onClick={() => handleAddModule(selectedCourse.id)}
+              className="w-full flex items-center gap-2 px-4 py-2 text-sm text-indigo-600 hover:bg-indigo-50 transition-colors"
+            >
+              <Plus size={16} />
+              Add Module
+            </button>
+          )}
+
           {selectedCourse.modules.length === 0 ? (
             <div className="p-4 text-center text-slate-400">
               <p className="text-sm">No modules yet</p>
-              {role === 'creator' && (
+              {(role === 'creator' || role === 'superadmin') && (
                 <p className="text-xs mt-1">Add modules to build your course</p>
               )}
             </div>
           ) : (
-            selectedCourse.modules.map((module) => (
+            selectedCourse.modules.map((module, moduleIndex) => (
               <div key={module.id} className="mb-1">
-                <button
-                  onClick={() => setActiveModuleId(activeModuleId === module.id ? null : module.id)}
-                  className="w-full flex items-center justify-between px-4 py-3 bg-slate-50 hover:bg-slate-100 transition-colors"
-                >
-                  <span className="font-semibold text-sm text-slate-700">{module.title}</span>
-                  {activeModuleId === module.id ? <ChevronDown size={16} /> : <ChevronRight size={16} />}
-                </button>
+                <div className="flex items-center bg-slate-50 hover:bg-slate-100 transition-colors">
+                  <button
+                    onClick={() => setActiveModuleId(activeModuleId === module.id ? null : module.id)}
+                    className="flex-1 flex items-center justify-between px-4 py-3"
+                  >
+                    <span className="font-semibold text-sm text-slate-700">{module.title}</span>
+                    {activeModuleId === module.id ? <ChevronDown size={16} /> : <ChevronRight size={16} />}
+                  </button>
+
+                  {/* Module actions for creators */}
+                  {(role === 'creator' || role === 'superadmin') && (
+                    <div className="flex items-center gap-1 pr-2">
+                      <button
+                        onClick={() => handleMoveModule(module.id, 'up')}
+                        disabled={moduleIndex === 0}
+                        className="p-1 text-slate-400 hover:text-slate-600 disabled:opacity-30"
+                        title="Move up"
+                      >
+                        <ArrowUp size={14} />
+                      </button>
+                      <button
+                        onClick={() => handleMoveModule(module.id, 'down')}
+                        disabled={moduleIndex === selectedCourse.modules.length - 1}
+                        className="p-1 text-slate-400 hover:text-slate-600 disabled:opacity-30"
+                        title="Move down"
+                      >
+                        <ArrowDown size={14} />
+                      </button>
+                      <button
+                        onClick={() => handleEditModule(module)}
+                        className="p-1 text-slate-400 hover:text-indigo-600"
+                        title="Edit module"
+                      >
+                        <Pencil size={14} />
+                      </button>
+                    </div>
+                  )}
+                </div>
 
                 {activeModuleId === module.id && (
                   <div className="bg-white">
+                    {/* Add Lesson Button for Creators */}
+                    {(role === 'creator' || role === 'superadmin') && (
+                      <button
+                        onClick={() => handleAddLesson(module.id)}
+                        className="w-full flex items-center gap-2 px-6 py-2 text-xs text-indigo-600 hover:bg-indigo-50 transition-colors border-l-4 border-transparent"
+                      >
+                        <Plus size={14} />
+                        Add Lesson
+                      </button>
+                    )}
+
                     {module.lessons.length === 0 ? (
                       <div className="px-6 py-3 text-xs text-slate-400">
                         No lessons in this module
                       </div>
                     ) : (
-                      module.lessons.map((lesson) => (
-                        <button
+                      module.lessons.map((lesson, lessonIndex) => (
+                        <div
                           key={lesson.id}
-                          onClick={() => setActiveLesson(lesson)}
-                          className={`w-full flex items-center gap-3 px-6 py-3 text-left transition-colors border-l-4
+                          className={`flex items-center border-l-4 transition-colors
                             ${activeLesson?.id === lesson.id
                               ? 'border-indigo-600 bg-indigo-50/50'
                               : 'border-transparent hover:bg-slate-50'}
                           `}
                         >
-                          <div className={`shrink-0 ${lesson.is_completed ? 'text-emerald-500' : 'text-slate-400'}`}>
-                            {lesson.is_completed ? (
-                              <CheckCircle size={16} />
-                            ) : lesson.type === 'video' ? (
-                              <PlayCircle size={16} />
-                            ) : (
-                              <FileText size={16} />
-                            )}
-                          </div>
-                          <div className="flex-1 min-w-0">
-                            <p className={`text-sm font-medium ${activeLesson?.id === lesson.id ? 'text-indigo-900' : 'text-slate-600'}`}>
-                              {lesson.title}
-                            </p>
-                            {lesson.duration_minutes && (
-                              <span className="text-xs text-slate-400">
-                                {formatDuration(lesson.duration_minutes)}
-                              </span>
-                            )}
-                          </div>
-                        </button>
+                          <button
+                            onClick={() => setActiveLesson(lesson)}
+                            className="flex-1 flex items-center gap-3 px-6 py-3 text-left"
+                          >
+                            <div className={`shrink-0 ${lesson.is_completed ? 'text-emerald-500' : 'text-slate-400'}`}>
+                              {lesson.is_completed ? (
+                                <CheckCircle size={16} />
+                              ) : lesson.type === 'video' ? (
+                                <PlayCircle size={16} />
+                              ) : (
+                                <FileText size={16} />
+                              )}
+                            </div>
+                            <div className="flex-1 min-w-0">
+                              <p className={`text-sm font-medium ${activeLesson?.id === lesson.id ? 'text-indigo-900' : 'text-slate-600'}`}>
+                                {lesson.title}
+                              </p>
+                              {lesson.duration_minutes && (
+                                <span className="text-xs text-slate-400">
+                                  {formatDuration(lesson.duration_minutes)}
+                                </span>
+                              )}
+                            </div>
+                          </button>
+
+                          {/* Lesson actions for creators */}
+                          {(role === 'creator' || role === 'superadmin') && (
+                            <div className="flex items-center gap-1 pr-3">
+                              <button
+                                onClick={() => handleMoveLesson(lesson.id, module.id, 'up')}
+                                disabled={lessonIndex === 0}
+                                className="p-1 text-slate-400 hover:text-slate-600 disabled:opacity-30"
+                                title="Move up"
+                              >
+                                <ArrowUp size={12} />
+                              </button>
+                              <button
+                                onClick={() => handleMoveLesson(lesson.id, module.id, 'down')}
+                                disabled={lessonIndex === module.lessons.length - 1}
+                                className="p-1 text-slate-400 hover:text-slate-600 disabled:opacity-30"
+                                title="Move down"
+                              >
+                                <ArrowDown size={12} />
+                              </button>
+                              <button
+                                onClick={() => handleEditLesson(lesson)}
+                                className="p-1 text-slate-400 hover:text-indigo-600"
+                                title="Edit lesson"
+                              >
+                                <Pencil size={12} />
+                              </button>
+                            </div>
+                          )}
+                        </div>
                       ))
                     )}
                   </div>
@@ -622,6 +876,57 @@ const CourseLMS: React.FC = () => {
           courseId={selectedCourse.id}
           currentLesson={activeLesson ? { id: activeLesson.id, title: activeLesson.title } : null}
           currentModule={activeModuleId ? selectedCourse.modules.find(m => m.id === activeModuleId)?.title : null}
+        />
+      )}
+
+      {/* Module Edit Modal */}
+      {showModuleModal && (
+        <ModuleEditModal
+          module={editingModule}
+          courseId={moduleForCourse}
+          isOpen={showModuleModal}
+          onClose={() => {
+            setShowModuleModal(false);
+            setEditingModule(null);
+          }}
+          onSave={handleModuleSave}
+          onDelete={editingModule ? handleModuleDelete : undefined}
+        />
+      )}
+
+      {/* Lesson Edit Modal */}
+      {showLessonModal && (
+        <LessonEditModal
+          lesson={editingLesson}
+          moduleId={lessonForModule}
+          isOpen={showLessonModal}
+          onClose={() => {
+            setShowLessonModal(false);
+            setEditingLesson(null);
+          }}
+          onSave={handleLessonSave}
+          onDelete={editingLesson ? handleLessonDelete : undefined}
+        />
+      )}
+
+      {/* Course Edit Modal (for listing view) */}
+      {editingCourse && (
+        <CourseEditModal
+          course={editingCourse}
+          isOpen={!!editingCourse}
+          onClose={() => setEditingCourse(null)}
+          onSave={handleCourseEditSave}
+          onDelete={handleCourseDelete}
+        />
+      )}
+
+      {/* Course Analytics Panel */}
+      {showAnalytics && (
+        <CourseAnalyticsPanel
+          courseId={showAnalytics}
+          courseName={courses.find(c => c.id === showAnalytics)?.title || 'Course'}
+          isOpen={!!showAnalytics}
+          onClose={() => setShowAnalytics(null)}
         />
       )}
     </div>
