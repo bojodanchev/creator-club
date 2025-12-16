@@ -164,15 +164,15 @@ const CommunityHub: React.FC = () => {
   };
 
   const handleCreatePost = async () => {
-    if (!user || !selectedChannel || !newPost.trim() || !selectedCommunity) return;
+    if (!user || !selectedChannel || !newPost.trim() || !selectedCommunity || !profile) return;
 
     setIsPostingLoading(true);
     try {
       const post = await createPost(selectedChannel.id, user.id, newPost.trim());
       if (post) {
         setNewPost('');
-        // Award points for creating a post
-        await awardPoints(user.id, selectedCommunity.id, 10, 'Created a post');
+        // Award points for creating a post (using profile.id for FK compatibility)
+        await awardPoints(profile.id, selectedCommunity.id, 10, 'Created a post');
         // Reload posts to get the full post with author
         await loadPosts(selectedChannel.id);
         // Reload user points and leaderboard

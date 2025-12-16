@@ -7,7 +7,7 @@ import { DbPoints, DbPointTransaction } from '../../core/supabase/database.types
 
 /**
  * Gets a user's points and level for a specific community
- * @param userId - The user's ID
+ * @param userId - The auth user's ID (not profile ID)
  * @param communityId - The community's ID
  * @returns User's points record or null if not found
  */
@@ -15,10 +15,21 @@ export async function getUserPoints(
   userId: string,
   communityId: string
 ): Promise<DbPoints | null> {
+  // First, get the profile ID for this user (FK references profiles.id, not user_id)
+  const { data: profile, error: profileError } = await supabase
+    .from('profiles')
+    .select('id')
+    .eq('user_id', userId)
+    .single();
+
+  if (profileError || !profile) {
+    return null;
+  }
+
   const { data, error } = await supabase
     .from('points')
     .select('*')
-    .eq('user_id', userId)
+    .eq('user_id', profile.id)
     .eq('community_id', communityId)
     .single();
 
@@ -60,14 +71,14 @@ export async function getCommunityLeaderboard(
 /**
  * Awards points to a user for an action
  * Creates a transaction record and updates the user's total points and level
- * @param userId - The user's ID
+ * @param profileId - The user's profile ID (profiles.id)
  * @param communityId - The community's ID
  * @param points - Number of points to award
  * @param reason - Reason for awarding points
  * @returns The created transaction record or null if failed
  */
 export async function awardPoints(
-  userId: string,
+  profileId: string,
   communityId: string,
   points: number,
   reason: string
@@ -76,7 +87,7 @@ export async function awardPoints(
   const { data: transaction, error: transactionError } = await supabase
     .from('point_transactions')
     .insert({
-      user_id: userId,
+      user_id: profileId,
       community_id: communityId,
       points,
       reason,
@@ -90,7 +101,8 @@ export async function awardPoints(
   }
 
   // Then, update or create the user's points record
-  const existingPoints = await getUserPoints(userId, communityId);
+  // Note: getUserPointsByProfileId uses profileId directly
+  const existingPoints = await getUserPointsByProfileId(profileId, communityId);
 
   if (existingPoints) {
     // Update existing record
@@ -116,7 +128,7 @@ export async function awardPoints(
     const { error: insertError } = await supabase
       .from('points')
       .insert({
-        user_id: userId,
+        user_id: profileId,
         community_id: communityId,
         total_points: points,
         level: newLevel,
@@ -128,6 +140,27 @@ export async function awardPoints(
   }
 
   return transaction;
+}
+
+/**
+ * Internal function to get points by profile ID directly
+ */
+async function getUserPointsByProfileId(
+  profileId: string,
+  communityId: string
+): Promise<DbPoints | null> {
+  const { data, error } = await supabase
+    .from('points')
+    .select('*')
+    .eq('user_id', profileId)
+    .eq('community_id', communityId)
+    .single();
+
+  if (error && error.code !== 'PGRST116') {
+    console.error('Error fetching user points by profile ID:', error);
+  }
+
+  return data || null;
 }
 
 /**

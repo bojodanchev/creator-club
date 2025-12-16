@@ -27,11 +27,23 @@ export async function getCommunities(): Promise<DbCommunity[]> {
   return data || [];
 }
 
-export async function getCreatorCommunities(creatorId: string): Promise<DbCommunity[]> {
+export async function getCreatorCommunities(userId: string): Promise<DbCommunity[]> {
+  // First, get the profile ID for this user (FK references profiles.id, not user_id)
+  const { data: profile, error: profileError } = await supabase
+    .from('profiles')
+    .select('id')
+    .eq('user_id', userId)
+    .single();
+
+  if (profileError || !profile) {
+    console.error('Error fetching profile for creator communities:', profileError);
+    return [];
+  }
+
   const { data, error } = await supabase
     .from('communities')
     .select('*')
-    .eq('creator_id', creatorId)
+    .eq('creator_id', profile.id)
     .order('created_at', { ascending: false });
 
   if (error) {
@@ -42,10 +54,22 @@ export async function getCreatorCommunities(creatorId: string): Promise<DbCommun
 }
 
 export async function getMemberCommunities(userId: string): Promise<DbCommunity[]> {
+  // First, get the profile ID for this user (FK references profiles.id, not user_id)
+  const { data: profile, error: profileError } = await supabase
+    .from('profiles')
+    .select('id')
+    .eq('user_id', userId)
+    .single();
+
+  if (profileError || !profile) {
+    console.error('Error fetching profile for member communities:', profileError);
+    return [];
+  }
+
   const { data, error } = await supabase
     .from('memberships')
     .select('community:communities(*)')
-    .eq('user_id', userId);
+    .eq('user_id', profile.id);
 
   if (error) {
     console.error('Error fetching member communities:', error);
@@ -57,15 +81,27 @@ export async function getMemberCommunities(userId: string): Promise<DbCommunity[
 }
 
 export async function createCommunity(
-  creatorId: string,
+  userId: string,
   name: string,
   description?: string,
   isPublic: boolean = false
 ): Promise<DbCommunity | null> {
+  // First, get the profile ID for this user (FK references profiles.id, not user_id)
+  const { data: profile, error: profileError } = await supabase
+    .from('profiles')
+    .select('id')
+    .eq('user_id', userId)
+    .single();
+
+  if (profileError || !profile) {
+    console.error('Error fetching profile for community creation:', profileError);
+    return null;
+  }
+
   const { data, error } = await supabase
     .from('communities')
     .insert({
-      creator_id: creatorId,
+      creator_id: profile.id,
       name,
       description,
       is_public: isPublic,
@@ -131,10 +167,22 @@ export async function joinCommunity(
   communityId: string,
   role: MembershipRole = 'member'
 ): Promise<DbMembership | null> {
+  // First, get the profile ID for this user (FK references profiles.id, not user_id)
+  const { data: profile, error: profileError } = await supabase
+    .from('profiles')
+    .select('id')
+    .eq('user_id', userId)
+    .single();
+
+  if (profileError || !profile) {
+    console.error('Error fetching profile for join community:', profileError);
+    return null;
+  }
+
   const { data, error } = await supabase
     .from('memberships')
     .insert({
-      user_id: userId,
+      user_id: profile.id,
       community_id: communityId,
       role,
     })
@@ -152,10 +200,21 @@ export async function getMembership(
   userId: string,
   communityId: string
 ): Promise<DbMembership | null> {
+  // First, get the profile ID for this user (FK references profiles.id, not user_id)
+  const { data: profile, error: profileError } = await supabase
+    .from('profiles')
+    .select('id')
+    .eq('user_id', userId)
+    .single();
+
+  if (profileError || !profile) {
+    return null;
+  }
+
   const { data, error } = await supabase
     .from('memberships')
     .select('*')
-    .eq('user_id', userId)
+    .eq('user_id', profile.id)
     .eq('community_id', communityId)
     .single();
 
@@ -202,13 +261,25 @@ export async function getPosts(channelId: string): Promise<DbPostWithAuthor[]> {
     .select('post_id')
     .in('post_id', postIds);
 
-  // Get current user's likes
+  // Get current user's likes (need to lookup profile.id from auth user)
   const { data: { user } } = await supabase.auth.getUser();
-  const { data: userLikes } = user ? await supabase
-    .from('post_likes')
-    .select('post_id')
-    .eq('user_id', user.id)
-    .in('post_id', postIds) : { data: [] };
+  let userLikes: { post_id: string }[] | null = [];
+  if (user) {
+    const { data: profile } = await supabase
+      .from('profiles')
+      .select('id')
+      .eq('user_id', user.id)
+      .single();
+
+    if (profile) {
+      const { data } = await supabase
+        .from('post_likes')
+        .select('post_id')
+        .eq('user_id', profile.id)
+        .in('post_id', postIds);
+      userLikes = data;
+    }
+  }
 
   // Combine the data
   const likesMap = new Map<string, number>();
@@ -233,14 +304,26 @@ export async function getPosts(channelId: string): Promise<DbPostWithAuthor[]> {
 
 export async function createPost(
   channelId: string,
-  authorId: string,
+  userId: string,
   content: string
 ): Promise<DbPost | null> {
+  // First, get the profile ID for this user (FK references profiles.id, not user_id)
+  const { data: profile, error: profileError } = await supabase
+    .from('profiles')
+    .select('id')
+    .eq('user_id', userId)
+    .single();
+
+  if (profileError || !profile) {
+    console.error('Error fetching profile for create post:', profileError);
+    return null;
+  }
+
   const { data, error } = await supabase
     .from('posts')
     .insert({
       channel_id: channelId,
-      author_id: authorId,
+      author_id: profile.id,
       content,
     })
     .select()
@@ -276,11 +359,23 @@ export async function likePost(
   authorId?: string,
   communityId?: string
 ): Promise<boolean> {
+  // First, get the profile ID for this user (FK references profiles.id, not user_id)
+  const { data: profile, error: profileError } = await supabase
+    .from('profiles')
+    .select('id')
+    .eq('user_id', userId)
+    .single();
+
+  if (profileError || !profile) {
+    console.error('Error fetching profile for like post:', profileError);
+    return false;
+  }
+
   const { error } = await supabase
     .from('post_likes')
     .insert({
       post_id: postId,
-      user_id: userId,
+      user_id: profile.id,
     });
 
   if (error) {
@@ -288,8 +383,8 @@ export async function likePost(
     return false;
   }
 
-  // Award points to post author if provided
-  if (authorId && communityId && authorId !== userId) {
+  // Award points to post author if provided (authorId here is already profile.id)
+  if (authorId && communityId && authorId !== profile.id) {
     const { awardPoints } = await import('./pointsService');
     await awardPoints(authorId, communityId, 2, 'Received a like on post');
   }
@@ -298,11 +393,23 @@ export async function likePost(
 }
 
 export async function unlikePost(postId: string, userId: string): Promise<boolean> {
+  // First, get the profile ID for this user (FK references profiles.id, not user_id)
+  const { data: profile, error: profileError } = await supabase
+    .from('profiles')
+    .select('id')
+    .eq('user_id', userId)
+    .single();
+
+  if (profileError || !profile) {
+    console.error('Error fetching profile for unlike post:', profileError);
+    return false;
+  }
+
   const { error } = await supabase
     .from('post_likes')
     .delete()
     .eq('post_id', postId)
-    .eq('user_id', userId);
+    .eq('user_id', profile.id);
 
   if (error) {
     console.error('Error unliking post:', error);
@@ -348,15 +455,27 @@ export async function getComments(postId: string): Promise<DbPostCommentWithAuth
 
 export async function createComment(
   postId: string,
-  authorId: string,
+  userId: string,
   content: string,
   communityId?: string
 ): Promise<DbPostComment | null> {
+  // First, get the profile ID for this user (FK references profiles.id, not user_id)
+  const { data: profile, error: profileError } = await supabase
+    .from('profiles')
+    .select('id')
+    .eq('user_id', userId)
+    .single();
+
+  if (profileError || !profile) {
+    console.error('Error fetching profile for create comment:', profileError);
+    return null;
+  }
+
   const { data, error } = await supabase
     .from('post_comments')
     .insert({
       post_id: postId,
-      author_id: authorId,
+      author_id: profile.id,
       content,
     })
     .select()
@@ -370,7 +489,7 @@ export async function createComment(
   // Award points for creating a comment
   if (communityId) {
     const { awardPoints } = await import('./pointsService');
-    await awardPoints(authorId, communityId, 5, 'Created a comment');
+    await awardPoints(profile.id, communityId, 5, 'Created a comment');
   }
 
   return data;
