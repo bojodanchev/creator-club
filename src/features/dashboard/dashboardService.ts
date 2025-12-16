@@ -65,17 +65,26 @@ export async function getDashboardStats(creatorId: string): Promise<DashboardSta
     ? Math.round((completedEnrollments.length / enrollments.length) * 100)
     : 0;
 
-  // Get at-risk student count
-  const { count: atRiskCount } = await supabase
+  // Get at-risk student count (only for this creator's courses)
+  const { data: atRiskData } = await supabase
     .from('student_health')
-    .select('id', { count: 'exact' })
+    .select(`
+      id,
+      course:courses!course_id(creator_id)
+    `)
     .in('status', ['at_risk']);
+
+  // Filter to only count students from this creator's courses
+  const atRiskCount = atRiskData?.filter(h => {
+    const course = h.course as any;
+    return course?.creator_id === creatorId;
+  }).length || 0;
 
   return {
     totalStudents,
     activeStudents,
     completionRate,
-    atRiskCount: atRiskCount || 0,
+    atRiskCount,
   };
 }
 
