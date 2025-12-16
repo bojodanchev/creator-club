@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { ResponsiveContainer, AreaChart, Area, XAxis, YAxis, Tooltip, CartesianGrid } from 'recharts';
-import { AlertTriangle, TrendingUp, Users, DollarSign, ArrowUpRight, ArrowDownRight, Loader2, X, Mail, BookOpen, Calendar, Plus, MessageSquare, Sparkles } from 'lucide-react';
+import { AlertTriangle, TrendingUp, Users, DollarSign, ArrowUpRight, ArrowDownRight, Loader2, X, Mail, BookOpen, Calendar, Plus, MessageSquare, Sparkles, Clock } from 'lucide-react';
 import { useAuth } from '../../core/contexts/AuthContext';
 import {
   getDashboardStats,
@@ -50,6 +50,7 @@ const Dashboard: React.FC = () => {
     activeStudents: 0,
     completionRate: 0,
     atRiskCount: 0,
+    inactiveCount: 0,
   });
   const [selectedStudent, setSelectedStudent] = useState<AtRiskStudent | null>(null);
   const [showMessageModal, setShowMessageModal] = useState(false);
@@ -201,7 +202,7 @@ const Dashboard: React.FC = () => {
       )}
 
       {/* Stats Grid */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-6">
         <StatCard
           title="Total Students"
           value={stats.totalStudents.toString()}
@@ -230,6 +231,14 @@ const Dashboard: React.FC = () => {
           icon={AlertTriangle}
           color="bg-rose-500"
           isPositive={stats.atRiskCount === 0}
+        />
+        <StatCard
+          title="Inactive (7d+)"
+          value={stats.inactiveCount.toString()}
+          change={stats.inactiveCount > 0 ? `${stats.inactiveCount} need attention` : 'All active'}
+          icon={Clock}
+          color="bg-amber-500"
+          isPositive={stats.inactiveCount === 0}
         />
       </div>
 

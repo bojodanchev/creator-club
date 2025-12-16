@@ -16,6 +16,7 @@ export interface DashboardStats {
   activeStudents: number;
   completionRate: number;
   atRiskCount: number;
+  inactiveCount: number;
 }
 
 export interface AtRiskStudent {
@@ -54,7 +55,7 @@ export async function getDashboardStats(creatorId: string): Promise<DashboardSta
 
   if (enrollmentError) {
     console.error('Error fetching enrollments:', enrollmentError);
-    return { totalStudents: 0, activeStudents: 0, completionRate: 0, atRiskCount: 0 };
+    return { totalStudents: 0, activeStudents: 0, completionRate: 0, atRiskCount: 0, inactiveCount: 0 };
   }
 
   const totalStudents = new Set(enrollments?.map(e => e.user_id) || []).size;
@@ -80,11 +81,28 @@ export async function getDashboardStats(creatorId: string): Promise<DashboardSta
     return course?.creator_id === creatorId;
   }).length || 0;
 
+  // Get inactive student count (last_activity_at > 7 days ago or null)
+  const sevenDaysAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString();
+  const { data: inactiveData } = await supabase
+    .from('student_health')
+    .select(`
+      id,
+      last_activity_at,
+      course:courses!course_id(creator_id)
+    `)
+    .or(`last_activity_at.is.null,last_activity_at.lt.${sevenDaysAgo}`);
+
+  const inactiveCount = inactiveData?.filter(h => {
+    const course = h.course as any;
+    return course?.creator_id === creatorId;
+  }).length || 0;
+
   return {
     totalStudents,
     activeStudents,
     completionRate,
     atRiskCount,
+    inactiveCount,
   };
 }
 
@@ -106,6 +124,97 @@ export async function getAtRiskStudents(creatorId: string): Promise<AtRiskStuden
 
   if (healthError) {
     console.error('Error fetching at-risk students:', healthError);
+    return [];
+  }
+
+  // Filter to only include students from this creator's courses
+  const filteredData = healthData?.filter(h => {
+    const course = h.course as any;
+    return course?.creator_id === creatorId;
+  }) || [];
+
+  return filteredData.map(h => {
+    const profile = h.profile as DbProfile;
+    const course = h.course as any;
+
+    return {
+      id: h.id,
+      user_id: h.user_id,
+      name: profile?.full_name || profile?.email || 'Unknown',
+      email: profile?.email || '',
+      avatar_url: profile?.avatar_url,
+      risk_score: h.risk_score,
+      status: h.status,
+      reason: generateRiskReason(h),
+      last_activity_at: h.last_activity_at,
+      course_title: course?.title,
+    };
+  });
+}
+
+/**
+ * Get students by status (at_risk, stable, top_member)
+ */
+export async function getStudentsByStatus(
+  creatorId: string,
+  status: StudentStatus
+): Promise<AtRiskStudent[]> {
+  const { data: healthData, error } = await supabase
+    .from('student_health')
+    .select(`
+      *,
+      profile:profiles!user_id(*),
+      course:courses!course_id(title, creator_id)
+    `)
+    .eq('status', status)
+    .order('risk_score', { ascending: status === 'at_risk' ? false : true });
+
+  if (error) {
+    console.error(`Error fetching ${status} students:`, error);
+    return [];
+  }
+
+  // Filter to only include students from this creator's courses
+  const filteredData = healthData?.filter(h => {
+    const course = h.course as any;
+    return course?.creator_id === creatorId;
+  }) || [];
+
+  return filteredData.map(h => {
+    const profile = h.profile as DbProfile;
+    const course = h.course as any;
+
+    return {
+      id: h.id,
+      user_id: h.user_id,
+      name: profile?.full_name || profile?.email || 'Unknown',
+      email: profile?.email || '',
+      avatar_url: profile?.avatar_url,
+      risk_score: h.risk_score,
+      status: h.status,
+      reason: generateRiskReason(h),
+      last_activity_at: h.last_activity_at,
+      course_title: course?.title,
+    };
+  });
+}
+
+/**
+ * Get all students regardless of status
+ */
+export async function getAllStudents(creatorId: string): Promise<AtRiskStudent[]> {
+  const { data: healthData, error } = await supabase
+    .from('student_health')
+    .select(`
+      *,
+      profile:profiles!user_id(*),
+      course:courses!course_id(title, creator_id)
+    `)
+    .order('status', { ascending: true })
+    .order('risk_score', { ascending: false });
+
+  if (error) {
+    console.error('Error fetching all students:', error);
     return [];
   }
 

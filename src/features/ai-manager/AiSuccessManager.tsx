@@ -1,11 +1,13 @@
-import React, { useState, useEffect, useRef } from 'react';
-import { Send, Bot, User, Sparkles, AlertTriangle, FileText, Loader2, RefreshCw } from 'lucide-react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
+import { Send, Bot, User, Sparkles, AlertTriangle, FileText, Loader2, RefreshCw, CheckCircle, Star, Users, Plus, History, X } from 'lucide-react';
 import { sendMentorMessage, analyzeStudentRisks } from './geminiService';
-import { AIMessage, Student, RiskLevel } from '../../core/types';
-import { getAtRiskStudents, AtRiskStudent } from '../dashboard/dashboardService';
+import { AIMessage, Student, RiskLevel, AIConversation, AIMessageRecord } from '../../core/types';
+import { getAtRiskStudents, getStudentsByStatus, getAllStudents, AtRiskStudent } from '../dashboard/dashboardService';
 import { recalculateAllStudentHealth, getStudentHealthReport } from './studentHealthService';
+import { getRecentConversation, saveConversation, getConversationHistory, deleteConversation } from './conversationService';
 import { useAuth } from '../../core/contexts/AuthContext';
 import AiResponseText from '../../components/ui/AiResponseText';
+import { StudentStatus } from '../../core/supabase/database.types';
 
 const AiSuccessManager: React.FC = () => {
   const { user, profile } = useAuth();
@@ -23,10 +25,17 @@ const AiSuccessManager: React.FC = () => {
   const [report, setReport] = useState<string | null>(null);
   const [isLoadingReport, setIsLoadingReport] = useState(false);
 
-  // At-Risk Students State
-  const [atRiskStudents, setAtRiskStudents] = useState<AtRiskStudent[]>([]);
+  // Students State with Status Filter
+  const [students, setStudents] = useState<AtRiskStudent[]>([]);
+  const [statusFilter, setStatusFilter] = useState<StudentStatus | 'all'>('at_risk');
   const [isLoadingStudents, setIsLoadingStudents] = useState(false);
   const [isRecalculating, setIsRecalculating] = useState(false);
+
+  // Conversation Persistence State
+  const [currentConversation, setCurrentConversation] = useState<AIConversation | null>(null);
+  const [isSavingConversation, setIsSavingConversation] = useState(false);
+  const [showConversationHistory, setShowConversationHistory] = useState(false);
+  const [conversationHistory, setConversationHistory] = useState<AIConversation[]>([]);
 
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -36,25 +45,113 @@ const AiSuccessManager: React.FC = () => {
     scrollToBottom();
   }, [messages]);
 
-  // Load at-risk students on mount
+  // Load students on mount and when filter changes
   useEffect(() => {
     if (user) {
-      loadAtRiskStudents();
+      loadStudents(statusFilter);
+    }
+  }, [user, statusFilter]);
+
+  // Load most recent conversation on mount
+  useEffect(() => {
+    const loadConversation = async () => {
+      if (!user) return;
+
+      const conversation = await getRecentConversation(user.id, 'success_manager');
+
+      if (conversation && conversation.messages && conversation.messages.length > 0) {
+        // Convert AIMessageRecord[] to AIMessage[]
+        const loadedMessages: AIMessage[] = (conversation.messages as AIMessageRecord[]).map(m => ({
+          role: m.role === 'assistant' ? 'model' : m.role as 'user' | 'model',
+          text: m.content,
+          timestamp: m.timestamp ? new Date(m.timestamp) : new Date(),
+        }));
+
+        setMessages(loadedMessages);
+        setCurrentConversation(conversation);
+      }
+    };
+
+    if (user && messages.length === 1) {
+      loadConversation();
     }
   }, [user]);
 
-  const loadAtRiskStudents = async () => {
+  // Auto-save conversation after messages change (debounced)
+  useEffect(() => {
+    if (!user || messages.length <= 1) return;
+
+    const saveCurrentConversation = async () => {
+      setIsSavingConversation(true);
+
+      // Convert AIMessage[] to AIMessageRecord[]
+      const messagesToSave: AIMessageRecord[] = messages.map(m => ({
+        role: m.role === 'model' ? 'assistant' : m.role,
+        content: m.text,
+        timestamp: m.timestamp.toISOString(),
+      }));
+
+      const saved = await saveConversation(
+        user.id,
+        'success_manager',
+        messagesToSave,
+        undefined,
+        currentConversation?.id
+      );
+
+      if (saved && !currentConversation) {
+        setCurrentConversation(saved);
+      }
+
+      setIsSavingConversation(false);
+    };
+
+    // Debounce saving by 2 seconds
+    const timeoutId = setTimeout(saveCurrentConversation, 2000);
+
+    return () => clearTimeout(timeoutId);
+  }, [messages, user, currentConversation]);
+
+  const loadStudents = async (filter: StudentStatus | 'all') => {
     if (!user) return;
 
     setIsLoadingStudents(true);
     try {
-      const students = await getAtRiskStudents(user.id);
-      setAtRiskStudents(students);
+      const result = filter === 'all'
+        ? await getAllStudents(user.id)
+        : await getStudentsByStatus(user.id, filter);
+      setStudents(result);
     } catch (error) {
-      console.error('Error loading at-risk students:', error);
+      console.error('Error loading students:', error);
     } finally {
       setIsLoadingStudents(false);
     }
+  };
+
+  const loadHistory = async () => {
+    if (!user) return;
+    const history = await getConversationHistory(user.id, 'success_manager');
+    setConversationHistory(history);
+    setShowConversationHistory(true);
+  };
+
+  const startNewConversation = async () => {
+    setMessages([
+      { role: 'model', text: "Hello! I'm your AI Success Manager. How can I help you today?", timestamp: new Date() }
+    ]);
+    setCurrentConversation(null);
+    setShowConversationHistory(false);
+  };
+
+  const loadConversationFromHistory = (conv: AIConversation) => {
+    const loadedMessages: AIMessage[] = (conv.messages as AIMessageRecord[]).map(m => ({
+      role: m.role === 'assistant' ? 'model' : m.role as 'user' | 'model',
+      text: m.content,
+      timestamp: m.timestamp ? new Date(m.timestamp) : new Date(),
+    }));
+    setMessages(loadedMessages);
+    setCurrentConversation(conv);
+    setShowConversationHistory(false);
   };
 
   const handleRecalculateRiskScores = async () => {
@@ -65,13 +162,13 @@ const AiSuccessManager: React.FC = () => {
       const result = await recalculateAllStudentHealth(user.id);
       console.log(`Recalculated health for ${result.updated} students (${result.errors} errors)`);
 
-      // Reload at-risk students after recalculation
-      await loadAtRiskStudents();
+      // Reload students after recalculation
+      await loadStudents(statusFilter);
 
       // Show success message in chat
       const successMsg: AIMessage = {
         role: 'model',
-        text: `I've recalculated risk scores for all students. Found ${atRiskStudents.length} students who need attention.`,
+        text: `I've recalculated risk scores for all students. Found ${students.filter(s => s.status === 'at_risk').length} students who need attention.`,
         timestamp: new Date()
       };
       setMessages(prev => [...prev, successMsg]);
@@ -100,6 +197,7 @@ const AiSuccessManager: React.FC = () => {
     let contextMessage = userMsg.text;
 
     // If user is asking about students, add context
+    const atRiskStudents = students.filter(s => s.status === 'at_risk');
     if (atRiskStudents.length > 0 && (
       userMsg.text.toLowerCase().includes('student') ||
       userMsg.text.toLowerCase().includes('risk') ||
@@ -138,8 +236,11 @@ const AiSuccessManager: React.FC = () => {
 
     setIsLoadingReport(true);
 
+    // Get at-risk students for analysis
+    const atRiskForReport = students.filter(s => s.status === 'at_risk');
+
     // Convert AtRiskStudent to Student format for AI analysis
-    const studentsForAnalysis: Student[] = atRiskStudents.map(s => {
+    const studentsForAnalysis: Student[] = atRiskForReport.map(s => {
       // Map risk_score to RiskLevel
       let riskLevel: RiskLevel;
       if (s.risk_score >= 80) riskLevel = RiskLevel.CRITICAL;
@@ -185,6 +286,52 @@ const AiSuccessManager: React.FC = () => {
           <p className="text-slate-500">Your intelligent partner for community growth.</p>
         </div>
         <div className="flex items-center gap-3">
+          <button
+            onClick={startNewConversation}
+            className="flex items-center gap-2 px-3 py-2 bg-slate-100 text-slate-700 rounded-lg hover:bg-slate-200 transition-colors text-sm font-medium"
+          >
+            <Plus size={16} />
+            New Chat
+          </button>
+          <div className="relative">
+            <button
+              onClick={loadHistory}
+              className="flex items-center gap-2 px-3 py-2 bg-slate-100 text-slate-700 rounded-lg hover:bg-slate-200 transition-colors text-sm font-medium"
+            >
+              <History size={16} />
+              History
+            </button>
+            {showConversationHistory && (
+              <div className="absolute top-12 right-0 w-80 bg-white rounded-lg shadow-lg border border-slate-200 z-50 max-h-96 overflow-y-auto">
+                <div className="p-3 border-b border-slate-100 flex justify-between items-center">
+                  <h4 className="font-semibold text-sm">Conversation History</h4>
+                  <button onClick={() => setShowConversationHistory(false)} className="text-slate-400 hover:text-slate-600">
+                    <X size={16} />
+                  </button>
+                </div>
+                <div className="p-2">
+                  {conversationHistory.length === 0 ? (
+                    <p className="text-sm text-slate-500 text-center py-4">No past conversations</p>
+                  ) : (
+                    conversationHistory.map(conv => (
+                      <button
+                        key={conv.id}
+                        onClick={() => loadConversationFromHistory(conv)}
+                        className="w-full text-left p-3 rounded-lg hover:bg-slate-50 transition-colors"
+                      >
+                        <p className="text-sm font-medium text-slate-900 truncate">
+                          {(conv.messages as AIMessageRecord[])?.[1]?.content?.slice(0, 40) || 'Conversation'}...
+                        </p>
+                        <p className="text-xs text-slate-500 mt-1">
+                          {new Date(conv.updated_at).toLocaleDateString()}
+                        </p>
+                      </button>
+                    ))
+                  )}
+                </div>
+              </div>
+            )}
+          </div>
           <button
             onClick={handleRecalculateRiskScores}
             disabled={isRecalculating}
@@ -268,15 +415,33 @@ const AiSuccessManager: React.FC = () => {
             </div>
           </div>
 
-          {/* At-Risk Students Sidebar */}
+          {/* Students Sidebar with Status Filter */}
           <div className="w-80 bg-white rounded-xl shadow-sm border border-slate-100 overflow-hidden flex flex-col">
             <div className="p-4 border-b border-slate-100">
-              <h3 className="font-semibold text-slate-900 flex items-center gap-2">
-                <AlertTriangle size={18} className="text-orange-500" />
-                At-Risk Students
-              </h3>
-              <p className="text-xs text-slate-500 mt-1">
-                {atRiskStudents.length} students need attention
+              {/* Status Filter Tabs */}
+              <div className="flex gap-1 p-1 bg-slate-100 rounded-lg mb-3">
+                {[
+                  { value: 'at_risk' as const, label: 'At Risk', icon: AlertTriangle, activeColor: 'text-orange-600 bg-orange-50' },
+                  { value: 'stable' as const, label: 'Stable', icon: CheckCircle, activeColor: 'text-green-600 bg-green-50' },
+                  { value: 'top_member' as const, label: 'Top', icon: Star, activeColor: 'text-indigo-600 bg-indigo-50' },
+                  { value: 'all' as const, label: 'All', icon: Users, activeColor: 'text-slate-600 bg-slate-50' },
+                ].map(({ value, label, icon: Icon, activeColor }) => (
+                  <button
+                    key={value}
+                    onClick={() => setStatusFilter(value)}
+                    className={`flex-1 px-2 py-1.5 rounded-md text-xs font-semibold transition-all flex items-center justify-center gap-1 ${
+                      statusFilter === value
+                        ? `${activeColor} shadow-sm`
+                        : 'text-slate-500 hover:text-slate-700'
+                    }`}
+                  >
+                    <Icon size={12} />
+                    {label}
+                  </button>
+                ))}
+              </div>
+              <p className="text-xs text-slate-500">
+                {students.length} {statusFilter === 'all' ? 'total' : statusFilter.replace('_', ' ')} students
               </p>
             </div>
             <div className="flex-1 overflow-y-auto p-4 space-y-3">
@@ -284,16 +449,24 @@ const AiSuccessManager: React.FC = () => {
                 <div className="flex items-center justify-center h-32">
                   <Loader2 className="animate-spin text-slate-400" />
                 </div>
-              ) : atRiskStudents.length === 0 ? (
+              ) : students.length === 0 ? (
                 <div className="text-center text-slate-500 text-sm py-8">
-                  <p>No at-risk students found.</p>
-                  <p className="text-xs mt-2">All students are doing well!</p>
+                  <p>No {statusFilter === 'all' ? '' : statusFilter.replace('_', ' ')} students found.</p>
+                  <p className="text-xs mt-2">
+                    {statusFilter === 'at_risk' ? 'All students are doing well!' : 'Try a different filter.'}
+                  </p>
                 </div>
               ) : (
-                atRiskStudents.map((student) => (
+                students.map((student) => (
                   <div
                     key={student.id}
-                    className="p-3 bg-slate-50 rounded-lg border border-slate-200 hover:border-indigo-300 transition-colors cursor-pointer"
+                    className={`p-3 rounded-lg border transition-colors cursor-pointer ${
+                      student.status === 'at_risk'
+                        ? 'bg-orange-50 border-orange-200 hover:border-orange-300'
+                        : student.status === 'top_member'
+                        ? 'bg-indigo-50 border-indigo-200 hover:border-indigo-300'
+                        : 'bg-green-50 border-green-200 hover:border-green-300'
+                    }`}
                   >
                     <div className="flex items-start gap-3">
                       <img
