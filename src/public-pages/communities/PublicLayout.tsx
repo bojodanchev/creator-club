@@ -6,19 +6,17 @@ import { Sparkles, Twitter, Github, Mail } from 'lucide-react';
 interface PublicLayoutProps {
   children: React.ReactNode;
   showNavigation?: boolean;
-  transparentNav?: boolean;
   showFooter?: boolean;
 }
 
 export const PublicLayout: React.FC<PublicLayoutProps> = ({
   children,
   showNavigation = true,
-  transparentNav = false,
   showFooter = true,
 }) => {
   return (
     <div className="min-h-screen bg-slate-50">
-      {showNavigation && <PublicNavigation transparent={transparentNav} />}
+      {showNavigation && <PublicNavigation />}
 
       <main className={showNavigation ? 'pt-16' : ''}>
         {children}

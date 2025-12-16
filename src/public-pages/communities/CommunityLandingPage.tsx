@@ -140,7 +140,7 @@ export const CommunityLandingPage: React.FC = () => {
   const placeholderImage = `https://ui-avatars.com/api/?name=${encodeURIComponent(community.name)}&background=6366f1&color=fff&size=800`;
 
   return (
-    <PublicLayout transparentNav>
+    <PublicLayout>
       {/* Hero Section */}
       <section className="relative">
         {/* Background Image */}
