@@ -84,7 +84,7 @@ export async function createCommunity(
   userId: string,
   name: string,
   description?: string,
-  isPublic: boolean = false
+  isPublic: boolean = true
 ): Promise<DbCommunity | null> {
   // First, get the profile ID for this user (FK references profiles.id, not user_id)
   const { data: profile, error: profileError } = await supabase
