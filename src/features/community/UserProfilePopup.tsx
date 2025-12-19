@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { X, Loader2, MessageSquare, FileText, Calendar, User } from 'lucide-react';
+import { X, Loader2, MessageSquare, FileText, Calendar } from 'lucide-react';
 import { getUserProfileForPopup, UserProfilePopupData } from './communityService';
 
 interface UserProfilePopupProps {
@@ -103,16 +103,12 @@ const UserProfilePopup: React.FC<UserProfilePopupProps> = ({
                 <div className="w-full h-full flex items-center justify-center">
                   <Loader2 className="w-8 h-8 animate-spin text-slate-300" />
                 </div>
-              ) : profile?.avatar_url ? (
+              ) : (
                 <img
-                  src={profile.avatar_url}
-                  alt={profile.full_name}
+                  src={profile?.avatar_url || `https://ui-avatars.com/api/?name=${encodeURIComponent(profile?.full_name || 'User')}&background=6366f1&color=fff&size=128`}
+                  alt={profile?.full_name || 'User'}
                   className="w-full h-full object-cover"
                 />
-              ) : (
-                <div className="w-full h-full flex items-center justify-center bg-gradient-to-br from-indigo-400 to-purple-500">
-                  <User size={40} className="text-white" />
-                </div>
               )}
             </div>
           </div>
