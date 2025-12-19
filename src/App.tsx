@@ -1,7 +1,8 @@
-import React, { useState } from 'react';
-import { BrowserRouter, Routes, Route, Navigate, useLocation } from 'react-router-dom';
+import React, { useState, useCallback } from 'react';
+import { BrowserRouter, Routes, Route, Navigate, useLocation, useNavigate } from 'react-router-dom';
 import { Menu } from 'lucide-react';
 import { AuthProvider, useAuth } from './core/contexts/AuthContext';
+import { CommunityProvider } from './core/contexts/CommunityContext';
 
 // Public components
 import LandingPage from './public-pages/LandingPage';
@@ -35,8 +36,10 @@ const LoadingScreen: React.FC = () => (
 // Protected App Layout with Sidebar and View Switching
 const AppLayout: React.FC = () => {
   const { role } = useAuth();
+  const navigate = useNavigate();
   const [currentView, setCurrentView] = useState<View>(View.DASHBOARD);
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
+  const [showCreateCommunityModal, setShowCreateCommunityModal] = useState(false);
 
   // Check if user is a student (not creator or superadmin)
   const isStudent = role === 'student' || role === 'member';
@@ -61,6 +64,17 @@ const AppLayout: React.FC = () => {
     }
   };
 
+  // Handler for "Browse More" - navigate to communities directory
+  const handleBrowseCommunities = useCallback(() => {
+    navigate('/communities');
+  }, [navigate]);
+
+  // Handler for "Create Community" - open the create community modal in CommunityHub
+  const handleCreateCommunity = useCallback(() => {
+    setCurrentView(View.COMMUNITY);
+    setShowCreateCommunityModal(true);
+  }, []);
+
   const renderContent = () => {
     switch (currentView) {
       case View.DASHBOARD:
@@ -71,7 +85,12 @@ const AppLayout: React.FC = () => {
           <Dashboard />
         );
       case View.COMMUNITY:
-        return <CommunityHub />;
+        return (
+          <CommunityHub
+            showCreateModal={showCreateCommunityModal}
+            onCloseCreateModal={() => setShowCreateCommunityModal(false)}
+          />
+        );
       case View.COURSES:
         return <CourseLMS />;
       case View.CALENDAR:
@@ -92,6 +111,8 @@ const AppLayout: React.FC = () => {
         setCurrentView={setCurrentView}
         isOpen={isSidebarOpen}
         setIsOpen={setIsSidebarOpen}
+        onBrowseCommunities={handleBrowseCommunities}
+        onCreateCommunity={handleCreateCommunity}
       />
 
       <div className="flex-1 flex flex-col h-screen overflow-hidden">
@@ -155,7 +176,9 @@ const AppRoutes: React.FC = () => {
         path="/app/*"
         element={
           <ProtectedRouteWrapper>
-            <AppLayout />
+            <CommunityProvider>
+              <AppLayout />
+            </CommunityProvider>
           </ProtectedRouteWrapper>
         }
       />

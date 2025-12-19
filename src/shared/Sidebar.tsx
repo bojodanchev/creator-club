@@ -1,18 +1,22 @@
-import React from 'react';
-import { LayoutDashboard, Users, GraduationCap, Calendar, BrainCircuit, Settings, LogOut, Menu } from 'lucide-react';
+import React, { useState } from 'react';
+import { LayoutDashboard, Users, GraduationCap, Calendar, BrainCircuit, Settings, LogOut, Menu, Plus } from 'lucide-react';
 import { View } from '../core/types';
 import { NAV_ITEMS } from '../core/constants';
 import { useAuth } from '../core/contexts/AuthContext';
+import CommunitySwitcher from './CommunitySwitcher';
 
 interface SidebarProps {
   currentView: View;
   setCurrentView: (view: View) => void;
   isOpen: boolean;
   setIsOpen: (isOpen: boolean) => void;
+  onBrowseCommunities?: () => void;
+  onCreateCommunity?: () => void;
 }
 
-const Sidebar: React.FC<SidebarProps> = ({ currentView, setCurrentView, isOpen, setIsOpen }) => {
+const Sidebar: React.FC<SidebarProps> = ({ currentView, setCurrentView, isOpen, setIsOpen, onBrowseCommunities, onCreateCommunity }) => {
   const { signOut, profile, role } = useAuth();
+  const isCreator = role === 'creator' || role === 'superadmin';
 
   // Check if user is a student (not creator or superadmin)
   const isStudent = role === 'student' || role === 'member';
@@ -70,7 +74,7 @@ const Sidebar: React.FC<SidebarProps> = ({ currentView, setCurrentView, isOpen, 
         </div>
 
         {/* Navigation */}
-        <nav className="flex-1 px-4 py-6 space-y-1">
+        <nav className="flex-1 px-4 py-6 space-y-1 overflow-y-auto">
           {getNavItems().map((item) => (
             <button
               key={item.id}
@@ -89,6 +93,24 @@ const Sidebar: React.FC<SidebarProps> = ({ currentView, setCurrentView, isOpen, 
               {item.label}
             </button>
           ))}
+
+          {/* Community Switcher - Always visible */}
+          <CommunitySwitcher
+            onBrowseMore={() => {
+              if (onBrowseCommunities) {
+                onBrowseCommunities();
+              }
+              setIsOpen(false);
+            }}
+            onCreateCommunity={isCreator ? () => {
+              // Navigate to community view first, then trigger create
+              setCurrentView(View.COMMUNITY);
+              if (onCreateCommunity) {
+                onCreateCommunity();
+              }
+              setIsOpen(false);
+            } : undefined}
+          />
         </nav>
 
         {/* Footer */}

@@ -1,15 +1,12 @@
 import React, { useState, useEffect } from 'react';
 import { Heart, MessageSquare, MoreHorizontal, Image as ImageIcon, Smile, Send, Plus, Users, Loader2, Trophy, Star, Zap } from 'lucide-react';
 import { useAuth } from '../../core/contexts/AuthContext';
+import { useCommunity } from '../../core/contexts/CommunityContext';
 import {
-  getCommunities,
-  getCreatorCommunities,
-  getMemberCommunities,
   getChannels,
   getPosts,
   createPost,
   createCommunity,
-  createChannel,
   toggleLike,
   joinCommunity,
   getMembership,
@@ -17,6 +14,7 @@ import {
   getComments,
   createComment,
 } from './communityService';
+import UserProfilePopup from './UserProfilePopup';
 import {
   getUserPoints,
   getCommunityLeaderboard,
@@ -24,19 +22,22 @@ import {
   getLevelProgress,
   getPointsForNextLevel,
 } from './pointsService';
-import { DbCommunity, DbCommunityChannel, DbPostWithAuthor, DbPoints, DbPostCommentWithAuthor } from '../../core/supabase/database.types';
+import { DbCommunityChannel, DbPostWithAuthor, DbPoints, DbPostCommentWithAuthor } from '../../core/supabase/database.types';
 
-const CommunityHub: React.FC = () => {
+interface CommunityHubProps {
+  showCreateModal?: boolean;
+  onCloseCreateModal?: () => void;
+}
+
+const CommunityHub: React.FC<CommunityHubProps> = ({ showCreateModal = false, onCloseCreateModal }) => {
   const { user, profile, role } = useAuth();
+  const { communities, selectedCommunity, setSelectedCommunity, isLoading: communitiesLoading, refreshCommunities } = useCommunity();
 
   // State
-  const [communities, setCommunities] = useState<DbCommunity[]>([]);
-  const [selectedCommunity, setSelectedCommunity] = useState<DbCommunity | null>(null);
   const [channels, setChannels] = useState<DbCommunityChannel[]>([]);
   const [selectedChannel, setSelectedChannel] = useState<DbCommunityChannel | null>(null);
   const [posts, setPosts] = useState<DbPostWithAuthor[]>([]);
   const [newPost, setNewPost] = useState('');
-  const [isLoading, setIsLoading] = useState(true);
   const [isPostingLoading, setIsPostingLoading] = useState(false);
   const [showCreateCommunity, setShowCreateCommunity] = useState(false);
   const [newCommunityName, setNewCommunityName] = useState('');
@@ -54,10 +55,16 @@ const CommunityHub: React.FC = () => {
   const [loadingComments, setLoadingComments] = useState<Set<string>>(new Set());
   const [submittingComment, setSubmittingComment] = useState(false);
 
-  // Load communities on mount
+  // Profile popup state
+  const [selectedProfileId, setSelectedProfileId] = useState<string | null>(null);
+  const [showProfilePopup, setShowProfilePopup] = useState(false);
+
+  // Handle external showCreateModal prop
   useEffect(() => {
-    loadCommunities();
-  }, [user, role]);
+    if (showCreateModal) {
+      setShowCreateCommunity(true);
+    }
+  }, [showCreateModal]);
 
   // Load channels when community changes
   useEffect(() => {
@@ -75,39 +82,6 @@ const CommunityHub: React.FC = () => {
       loadPosts(selectedChannel.id);
     }
   }, [selectedChannel]);
-
-  const loadCommunities = async () => {
-    if (!user) return;
-    setIsLoading(true);
-
-    try {
-      let communityList: DbCommunity[] = [];
-
-      // Creators see ONLY their own communities (they need to create one first)
-      if (role === 'creator' || role === 'superadmin') {
-        communityList = await getCreatorCommunities(user.id);
-      } else {
-        // Students/members see communities they're part of
-        communityList = await getMemberCommunities(user.id);
-
-        // Only students can fall back to seeing public communities (to join)
-        if (communityList.length === 0) {
-          communityList = await getCommunities();
-        }
-      }
-
-      setCommunities(communityList);
-
-      // Auto-select first community
-      if (communityList.length > 0 && !selectedCommunity) {
-        setSelectedCommunity(communityList[0]);
-      }
-    } catch (error) {
-      console.error('Error loading communities:', error);
-    } finally {
-      setIsLoading(false);
-    }
-  };
 
   const loadChannels = async (communityId: string) => {
     const channelList = await getChannels(communityId);
@@ -155,12 +129,18 @@ const CommunityHub: React.FC = () => {
       // Auto-join as admin
       await joinCommunity(user.id, community.id, 'admin');
 
-      // Refresh and select new community
-      setCommunities(prev => [community, ...prev]);
-      setSelectedCommunity(community);
+      // Refresh communities in context (will auto-select the new one)
+      await refreshCommunities();
       setNewCommunityName('');
       setShowCreateCommunity(false);
+      onCloseCreateModal?.();
     }
+  };
+
+  const handleCloseCreateModal = () => {
+    setShowCreateCommunity(false);
+    setNewCommunityName('');
+    onCloseCreateModal?.();
   };
 
   const handleCreatePost = async () => {
@@ -276,6 +256,16 @@ const CommunityHub: React.FC = () => {
     setNewComment(prev => new Map(prev).set(postId, value));
   };
 
+  const handleOpenProfile = (profileId: string) => {
+    setSelectedProfileId(profileId);
+    setShowProfilePopup(true);
+  };
+
+  const handleCloseProfile = () => {
+    setShowProfilePopup(false);
+    setSelectedProfileId(null);
+  };
+
   const formatTimestamp = (timestamp: string) => {
     const date = new Date(timestamp);
     const now = new Date();
@@ -292,7 +282,7 @@ const CommunityHub: React.FC = () => {
   };
 
   // Show loading state
-  if (isLoading) {
+  if (communitiesLoading) {
     return (
       <div className="flex items-center justify-center h-full">
         <Loader2 className="w-8 h-8 animate-spin text-indigo-600" />
@@ -338,7 +328,7 @@ const CommunityHub: React.FC = () => {
               />
               <div className="flex gap-3 mt-4">
                 <button
-                  onClick={() => setShowCreateCommunity(false)}
+                  onClick={handleCloseCreateModal}
                   className="flex-1 px-4 py-2 border border-slate-200 rounded-lg hover:bg-slate-50"
                 >
                   Cancel
@@ -530,14 +520,24 @@ const CommunityHub: React.FC = () => {
             <div key={post.id} className="bg-white rounded-xl shadow-sm border border-slate-100 p-5">
               <div className="flex justify-between items-start">
                 <div className="flex gap-3">
-                  <img
-                    src={post.author?.avatar_url || `https://ui-avatars.com/api/?name=${encodeURIComponent(post.author?.full_name || 'User')}&background=6366f1&color=fff`}
-                    className="w-10 h-10 rounded-full"
-                    alt={post.author?.full_name || 'User'}
-                  />
+                  <button
+                    onClick={() => post.author?.id && handleOpenProfile(post.author.id)}
+                    className="shrink-0 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2 rounded-full"
+                  >
+                    <img
+                      src={post.author?.avatar_url || `https://ui-avatars.com/api/?name=${encodeURIComponent(post.author?.full_name || 'User')}&background=6366f1&color=fff`}
+                      className="w-10 h-10 rounded-full hover:ring-2 hover:ring-indigo-300 transition-all cursor-pointer"
+                      alt={post.author?.full_name || 'User'}
+                    />
+                  </button>
                   <div>
                     <div className="flex items-center gap-2">
-                      <h4 className="font-semibold text-slate-900">{post.author?.full_name || 'Anonymous'}</h4>
+                      <button
+                        onClick={() => post.author?.id && handleOpenProfile(post.author.id)}
+                        className="font-semibold text-slate-900 hover:text-indigo-600 transition-colors cursor-pointer"
+                      >
+                        {post.author?.full_name || 'Anonymous'}
+                      </button>
                       {post.author?.role === 'creator' && (
                         <span className="bg-indigo-100 text-indigo-700 text-[10px] px-2 py-0.5 rounded-full font-bold">CREATOR</span>
                       )}
@@ -599,14 +599,24 @@ const CommunityHub: React.FC = () => {
                       ) : (
                         postComments.get(post.id)?.map(comment => (
                           <div key={comment.id} className="flex gap-3">
-                            <img
-                              src={comment.author?.avatar_url || `https://ui-avatars.com/api/?name=${encodeURIComponent(comment.author?.full_name || 'User')}&background=6366f1&color=fff`}
-                              className="w-8 h-8 rounded-full shrink-0"
-                              alt={comment.author?.full_name || 'User'}
-                            />
+                            <button
+                              onClick={() => comment.author?.id && handleOpenProfile(comment.author.id)}
+                              className="shrink-0 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2 rounded-full"
+                            >
+                              <img
+                                src={comment.author?.avatar_url || `https://ui-avatars.com/api/?name=${encodeURIComponent(comment.author?.full_name || 'User')}&background=6366f1&color=fff`}
+                                className="w-8 h-8 rounded-full hover:ring-2 hover:ring-indigo-300 transition-all cursor-pointer"
+                                alt={comment.author?.full_name || 'User'}
+                              />
+                            </button>
                             <div className="flex-1 bg-slate-50 rounded-lg p-3">
                               <div className="flex items-center gap-2 mb-1">
-                                <span className="text-sm font-medium text-slate-900">{comment.author?.full_name || 'Anonymous'}</span>
+                                <button
+                                  onClick={() => comment.author?.id && handleOpenProfile(comment.author.id)}
+                                  className="text-sm font-medium text-slate-900 hover:text-indigo-600 transition-colors cursor-pointer"
+                                >
+                                  {comment.author?.full_name || 'Anonymous'}
+                                </button>
                                 <span className="text-xs text-slate-400">{formatTimestamp(comment.created_at)}</span>
                               </div>
                               <p className="text-sm text-slate-700">{comment.content}</p>
@@ -670,10 +680,7 @@ const CommunityHub: React.FC = () => {
             />
             <div className="flex gap-3 mt-4">
               <button
-                onClick={() => {
-                  setShowCreateCommunity(false);
-                  setNewCommunityName('');
-                }}
+                onClick={handleCloseCreateModal}
                 className="flex-1 px-4 py-2 border border-slate-200 rounded-lg hover:bg-slate-50"
               >
                 Cancel
@@ -688,6 +695,15 @@ const CommunityHub: React.FC = () => {
             </div>
           </div>
         </div>
+      )}
+
+      {/* User Profile Popup */}
+      {selectedProfileId && (
+        <UserProfilePopup
+          profileId={selectedProfileId}
+          isOpen={showProfilePopup}
+          onClose={handleCloseProfile}
+        />
       )}
 
       {/* Leaderboard Modal */}
@@ -747,18 +763,26 @@ const CommunityHub: React.FC = () => {
                           {index + 1}
                         </div>
 
-                        <img
-                          src={member.user.avatar_url || `https://ui-avatars.com/api/?name=${encodeURIComponent(member.user.full_name)}&background=6366f1&color=fff`}
-                          className="w-10 h-10 rounded-full shrink-0"
-                          alt={member.user.full_name}
-                        />
+                        <button
+                          onClick={() => handleOpenProfile(member.user_id)}
+                          className="shrink-0 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2 rounded-full"
+                        >
+                          <img
+                            src={member.user.avatar_url || `https://ui-avatars.com/api/?name=${encodeURIComponent(member.user.full_name)}&background=6366f1&color=fff`}
+                            className="w-10 h-10 rounded-full hover:ring-2 hover:ring-indigo-300 transition-all cursor-pointer"
+                            alt={member.user.full_name}
+                          />
+                        </button>
 
                         <div className="flex-1 min-w-0">
                           <div className="flex items-center gap-2">
-                            <h4 className="font-semibold text-slate-900 truncate">
+                            <button
+                              onClick={() => handleOpenProfile(member.user_id)}
+                              className="font-semibold text-slate-900 truncate hover:text-indigo-600 transition-colors cursor-pointer"
+                            >
                               {member.user.full_name}
                               {isCurrentUser && <span className="text-indigo-600 ml-1">(You)</span>}
-                            </h4>
+                            </button>
                             {member.user.role === 'creator' && (
                               <span className="bg-indigo-100 text-indigo-700 text-[10px] px-2 py-0.5 rounded-full font-bold">CREATOR</span>
                             )}
