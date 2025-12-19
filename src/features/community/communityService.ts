@@ -864,3 +864,74 @@ function truncateContent(content: string, maxLength: number): string {
   if (content.length <= maxLength) return content;
   return content.substring(0, maxLength).trim() + '...';
 }
+
+// ============================================================================
+// USER PROFILE POPUP
+// ============================================================================
+
+/**
+ * Extended profile data for the profile popup
+ */
+export interface UserProfilePopupData {
+  id: string;
+  full_name: string;
+  avatar_url: string | null;
+  role: string;
+  bio: string | null;
+  joined_at: string;
+  postsCount: number;
+  commentsCount: number;
+}
+
+/**
+ * Get user profile data for the popup by profile ID
+ * Includes profile info, creator bio (if any), and contribution stats
+ */
+export async function getUserProfileForPopup(profileId: string): Promise<UserProfilePopupData | null> {
+  // Get basic profile info
+  const { data: profile, error: profileError } = await supabase
+    .from('profiles')
+    .select('id, full_name, avatar_url, role, created_at')
+    .eq('id', profileId)
+    .single();
+
+  if (profileError || !profile) {
+    console.error('Error fetching profile for popup:', profileError);
+    return null;
+  }
+
+  // Try to get creator profile for bio (if they're a creator)
+  let bio: string | null = null;
+  if (profile.role === 'creator' || profile.role === 'superadmin') {
+    const { data: creatorProfile } = await supabase
+      .from('creator_profiles')
+      .select('bio')
+      .eq('creator_id', profileId)
+      .single();
+
+    bio = creatorProfile?.bio || null;
+  }
+
+  // Get posts count
+  const { count: postsCount } = await supabase
+    .from('posts')
+    .select('*', { count: 'exact', head: true })
+    .eq('author_id', profileId);
+
+  // Get comments count
+  const { count: commentsCount } = await supabase
+    .from('post_comments')
+    .select('*', { count: 'exact', head: true })
+    .eq('author_id', profileId);
+
+  return {
+    id: profile.id,
+    full_name: profile.full_name || 'Unknown User',
+    avatar_url: profile.avatar_url,
+    role: profile.role,
+    bio,
+    joined_at: profile.created_at,
+    postsCount: postsCount || 0,
+    commentsCount: commentsCount || 0,
+  };
+}
