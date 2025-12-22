@@ -10,7 +10,7 @@ interface AuthContextType {
   session: Session | null;
   isLoading: boolean;
   signIn: (email: string, password: string) => Promise<{ error: AuthError | null }>;
-  signUp: (email: string, password: string, fullName: string, role: UserRole) => Promise<{ error: AuthError | null }>;
+  signUp: (email: string, password: string, fullName: string, role: UserRole, marketingOptIn?: boolean) => Promise<{ error: AuthError | null }>;
   signOut: () => Promise<void>;
 }
 
@@ -119,7 +119,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
   };
 
-  const signUp = async (email: string, password: string, fullName: string, role: UserRole) => {
+  const signUp = async (email: string, password: string, fullName: string, role: UserRole, marketingOptIn: boolean = false) => {
     try {
       // Determine the redirect URL based on environment
       const redirectUrl = import.meta.env.PROD
@@ -134,6 +134,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           data: {
             full_name: fullName,
             role: role,
+            marketing_opt_in: marketingOptIn,
           },
           emailRedirectTo: redirectUrl,
         },
