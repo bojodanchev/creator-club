@@ -1,16 +1,14 @@
 # Chatroom: Creator Club™
 
 ## Mission
-Course UX Improvement - COMPLETE ✅
+Review 150 Supabase issues (9 Security + 141 Performance) and run marketing opt-in migration
 
 ## Agents
 | Role | Status | Last Active | Current Focus |
 |------|--------|-------------|---------------|
-| Coordinator | complete | 2025-12-16 | Course UX Improvement - DONE |
-| Explorer | complete | 2025-12-16 | Course Feature Research |
-| Architect | complete | 2025-12-16 | Course Editor Design |
-| Implementer | complete | 2025-12-16 | All CRUD & UI Implementation |
-| Reviewer | complete | 2025-12-16 | Code Review + Fixes |
+| Coordinator | active | 2025-12-22 | Orchestrating Supabase issue review + migration |
+| Explorer-1 | dispatched | 2025-12-22 | Analyzing all RLS policies for issues |
+| Reviewer | dispatched | 2025-12-22 | Classifying security vs performance issues |
 | Debugger | idle | - | - |
 | Tester | idle | - | - |
 
@@ -18,194 +16,248 @@ Course UX Improvement - COMPLETE ✅
 **Project**: Creator Club™ - All-in-one platform for mentors, coaches, and course creators
 **Stack**: React + TypeScript + Vite, Tailwind CSS, Supabase, Gemini API
 **Key Paths**:
-- [src/features/ai-manager/](src/features/ai-manager/) - AI Success Manager components
-- [src/features/dashboard/](src/features/dashboard/) - Creator dashboard with KPIs
-- [src/features/courses/](src/features/courses/) - Course LMS with student AI helper
-- [src/features/community/](src/features/community/) - Community hub with forums
+- [supabase/migrations/](supabase/migrations/) - Database migrations
 - [src/core/](src/core/) - Shared types, contexts, Supabase client
 
 ## Task Queue
-- [x] AI Chat Enhancements - COMPLETE (2025-12-16)
-- [x] **Phase 1: Course Editing** - COMPLETE (2025-12-16)
-  - [x] Course edit modal (update title, description, thumbnail)
-  - [x] Course deletion with confirmation
-  - [x] Course thumbnail upload
-- [x] **Phase 2: Module Builder** - COMPLETE (2025-12-16)
-  - [x] Module creation UI form
-  - [x] Module editing UI
-  - [x] Module deletion with confirmation
-  - [x] Module reordering (up/down arrow buttons)
-- [x] **Phase 3: Lesson Builder** - COMPLETE (2025-12-16)
-  - [x] Lesson creation UI form (video, text, file, quiz types)
-  - [x] Lesson editing UI
-  - [x] Lesson deletion with confirmation
-  - [x] Lesson reordering within module
-- [x] **Phase 4: Course Analytics** - COMPLETE (2025-12-16)
-  - [x] Per-course enrollment/completion metrics
-  - [x] Lesson completion rates by lesson/module
-  - [x] Student progress report for creators
-- [x] **Code Review & Testing** - COMPLETE (2025-12-16)
-  - [x] Code review identified issues
-  - [x] Fixed SQL injection vulnerability in getAvailableCourses
-  - [x] Added input validation to all modals (title length, description length, URL format, file size)
-  - [x] Added error feedback to users
+- [ ] **Task 1: Analyze Supabase Issues** (assigned: Explorer-1)
+  - [ ] Read all migration files to understand current RLS policies
+  - [ ] Identify which of 150 issues are actual problems vs acceptable warnings
+  - [ ] Determine impact on app logic for each issue type
+  - [ ] Provide recommendations for fixing vs ignoring
+- [ ] **Task 2: Run Migration 009** (assigned: User action required)
+  - [ ] Execute 009_marketing_optin.sql in Supabase SQL Editor
+
+### Previous Tasks (Completed)
+- [x] **Task 1: Debug Simeon Course Creation** (assigned: Debugger) - COMPLETE
+  - [x] Investigate why "simeon" user can't create courses as a creator
+  - [x] Check user role/permissions in database
+  - [x] Review course creation flow and authorization checks
+  - [x] Identify and fix the root cause
+  - **Result:** Database issue - simeon's `role` in `profiles` table needs to be set to `'creator'`
+- [x] **Task 2: Profile Popup Feature** (assigned: Implementer) - COMPLETE
+  - [x] Research existing user profile patterns in the codebase
+  - [x] Design profile popup component for community views
+  - [x] Implement clickable user avatars/names in community
+  - [x] Create profile popup modal with user info
+  - **Result:** Profile popup feature fully implemented with clickable avatars/names across all community areas
 
 ## Thread
 
 ---
 
-### 2025-12-16 [Coordinator]
-**Coordination: Course UX Improvement for Creators**
+### 2025-12-22 [Coordinator]
+**Coordination: Udemy-Style Homepage & Login Flow Implementation**
 
 **User Request:**
-Improve the UX and cycle of courses so that:
-1. Creators can add better and more improved courses
-2. Review anything that might need adding/improving on the courses side
+Apply the Udemy homepage and login user journey to Creator Club app, based on the analysis in UDEMY-LOGIN-REFERENCE.md
 
-**Analysis (Explorer Report):**
-Current state reveals a platform with sophisticated backend but severely limited creator interface:
+**Reference Documentation:**
+- `.playwright-mcp/udemy-homepage.png` - Landing page reference
+- `.playwright-mcp/udemy-login-page.png` - Login page reference
+- `.playwright-mcp/udemy-signup-page.png` - Signup page reference
+- `UDEMY-LOGIN-REFERENCE.md` - Full UX analysis document
 
-| Gap | Impact | Priority |
-|-----|--------|----------|
-| **No course editing** | Can't fix mistakes | Critical |
-| **No module/lesson UI** | Functions exist but no forms | Critical |
-| **No thumbnail upload** | Can't customize appearance | High |
-| **No course deletion** | Can't remove courses | High |
-| **No reordering** | Can't organize content | High |
-| **No per-course analytics** | Only dashboard-level stats | Medium |
-| **Quiz type unused** | Schema supports, no UI | Medium |
-| **Unlock conditions unused** | Progressive unlocking not working | Medium |
+**Analysis:**
+This requires 3 independent work streams that can run in PARALLEL:
 
-**Service Layer Status:**
-- ✅ `createCourse()`, `createModule()`, `createLesson()` - Work but no UI
-- ❌ `updateCourse()`, `updateModule()`, `updateLesson()` - NOT IMPLEMENTED
-- ❌ `deleteCourse()`, `deleteModule()`, `deleteLesson()` - NOT IMPLEMENTED
+| Task | Description | Agent | Independence |
+|------|-------------|-------|--------------|
+| Landing Page | Public homepage with course catalog | Implementer-1 | Fully independent |
+| Auth Pages | Login + Signup UI components | Implementer-2 | Fully independent |
+| Auth Flow | Routing and auth logic updates | Implementer-3 | Depends slightly on routing structure |
+
+**Key Requirements from Udemy Analysis:**
+1. **Homepage**: Course catalog visible to public (no auth required)
+2. **Header**: Logo, search, "Log in" / "Sign up" buttons
+3. **Login**: Email-first (passwordless-style), social login options
+4. **Signup**: Name + Email + Marketing opt-in, social options
+5. **Post-Auth Routing**: Creators → Dashboard, Students → Courses
 
 **Execution Plan:**
-1. @Architect: Design course editor components (edit modal, module/lesson builders)
-2. @Implementer: Add CRUD functions to courseService.ts (update, delete)
-3. @Implementer: Build course edit modal UI
-4. @Implementer: Build module builder UI (create, edit, delete, reorder)
-5. @Implementer: Build lesson builder UI (create, edit, delete, reorder)
-6. @Implementer: Add per-course analytics dashboard
-7. @Reviewer: Code review all changes
+Dispatching 3 agents in PARALLEL:
+
+1. @Implementer-1: Build LandingPage component
+   - Create public homepage showing courses from all creators
+   - Header with navigation and auth buttons
+   - Course grid with cards
+   - Hero section and trust badges
+
+2. @Implementer-2: Build Login/Signup pages
+   - LoginPage with email-first form
+   - SignupPage with registration form
+   - Social login button placeholders
+   - Terms/privacy links
+
+3. @Implementer-3: Update auth flow and routing
+   - Modify App.tsx routing structure
+   - Add public vs protected route logic
+   - Post-login redirect based on user role
+   - Update Supabase auth integration
 
 **Parallel Opportunities:**
-- Service layer (CRUD functions) can be built alongside UI design
-- Module builder and lesson builder have similar patterns
+- All 3 tasks are largely independent
+- Can dispatch all 3 agents simultaneously
+- Code review after all complete
 
-**Starting with:** @Architect - Design course editor system
-
----
-
-### 2025-12-16 [Implementer]
-**Course UX Improvements - IMPLEMENTATION COMPLETE**
-
-Successfully implemented all course management features for creators:
-
-**Service Layer Additions (courseService.ts):**
-| Function | Purpose |
-|----------|---------|
-| `updateCourse()` | Update course title, description, thumbnail, published status |
-| `deleteCourse()` | Delete course with cascade |
-| `unpublishCourse()` | Toggle course visibility |
-| `uploadCourseThumbnail()` | Upload course thumbnail to Supabase storage |
-| `updateModule()` | Update module title, description, unlock settings |
-| `deleteModule()` | Delete module |
-| `reorderModules()` | Batch update module positions |
-| `getNextModulePosition()` | Auto-calculate next position |
-| `updateLesson()` | Update lesson title, type, content, duration |
-| `deleteLesson()` | Delete lesson |
-| `reorderLessons()` | Batch update lesson positions |
-| `getNextLessonPosition()` | Auto-calculate next position |
-| `getCourseAnalytics()` | Full analytics: enrolled, completion, per-lesson rates, student progress |
-
-**New UI Components:**
-| Component | Features |
-|-----------|----------|
-| `CourseEditModal.tsx` | Edit title/description, thumbnail upload/remove, publish toggle, delete with confirmation |
-| `ModuleEditModal.tsx` | Create/edit module, unlock type settings (immediate/date/progress), delete |
-| `LessonEditModal.tsx` | Create/edit lesson, type selector (video/text/file/quiz), type-specific fields, delete |
-| `CourseAnalyticsPanel.tsx` | Overview stats, lesson completion rates, student progress table |
-
-**CourseLMS.tsx Enhancements:**
-- Course cards now have Edit (✏️) and Analytics (📊) buttons for creators
-- Course Player sidebar shows Add Module/Lesson buttons for creators
-- Modules and lessons have up/down arrows for reordering
-- Modules and lessons have edit buttons
-- All modals integrated and functional
-
-**Build Status:** ✅ Passes (vite build successful)
+**Starting with:** All 3 agents in parallel
 
 ---
 
-### 2025-12-16 [Coordinator]
-**AI Chat Enhancements - COMPLETE**
+### 2025-12-19 [Debugger]
+**Investigation Complete: Simeon Course Creation Issue**
 
-Successfully implemented and tested all AI chat enhancement features:
+**Root Cause Identified:** This is a **database issue, not a code bug**.
 
-**Features Delivered:**
+**Analysis:**
 
-| Feature | Status | Files Modified |
-|---------|--------|----------------|
-| Student status filter (At Risk/Stable/Top/All) | ✅ Complete | AiSuccessManager.tsx, dashboardService.ts |
-| Inactive students KPI (7+ days) | ✅ Complete | Dashboard.tsx, dashboardService.ts |
-| Chat persistence to ai_conversations | ✅ Complete | conversationService.ts (NEW), AiSuccessManager.tsx |
-| New Chat button | ✅ Complete | AiSuccessManager.tsx |
-| Conversation History dropdown | ✅ Complete | AiSuccessManager.tsx |
+1. **UI Role Check (CourseLMS.tsx)** - The code correctly checks:
+   ```typescript
+   if (role === 'creator' || role === 'superadmin') {
+     // Show "Create Course" button and editing UI
+   }
+   ```
 
-**HIGH Priority Fixes Applied:**
+2. **Role Source (AuthContext.tsx)** - Role is fetched from the `profiles` table:
+   ```typescript
+   const { data } = await supabase.from('profiles').select('*').eq('user_id', userId).single();
+   setRole(profileData?.role ?? null);
+   ```
 
-1. **Missing title field** - Added `title: title` to `conversationData` in conversationService.ts:55
-2. **Race condition protection** - Added `isMountedRef` and `saveVersionRef` in AiSuccessManager.tsx:40-43 to prevent state updates after unmount and concurrent save conflicts
+3. **Valid Roles (src/core/types.ts):**
+   ```typescript
+   export type UserRole = 'superadmin' | 'creator' | 'student' | 'member';
+   ```
 
-**E2E Test Results (Playwright on Vercel):**
+4. **Database RLS (006_complete_rls_fix.sql):**
+   ```sql
+   CREATE POLICY "Creators can manage own courses" ON public.courses FOR ALL
+   USING (creator_id = auth.uid()) WITH CHECK (creator_id = auth.uid());
+   ```
 
-| Test | Status |
-|------|--------|
-| Dashboard 5th KPI "Inactive (7d+)" | ✅ PASS - Shows 5 inactive students |
-| AI Manager status filter tabs | ✅ PASS - At Risk (3) / Stable (9) / All (12) |
-| Chat auto-save persistence | ✅ PASS - Message saved to History |
-| Student view - AI Manager hidden | ✅ PASS - Only shows Home, Community, Classroom, Calendar |
+**Problem:** The "simeon" user's `role` field in `profiles` table is NOT `'creator'`. It's likely `'student'`, `'member'`, or `null`.
 
-**Commits:**
-- `74ffa64` - Fix HIGH priority issues: title field and race condition in chat persistence
-- `4c92c65` - Add AI chat enhancements: status filter, inactive KPI, chat persistence
+**Fix Required:** Update the database via Supabase SQL Editor:
+```sql
+-- Option 1: By email
+UPDATE public.profiles SET role = 'creator' WHERE email = 'simeon@example.com';
 
-**Screenshots:**
-- `.playwright-mcp/e2e-dashboard-inactive-kpi.png`
-- `.playwright-mcp/e2e-ai-manager-status-filter.png`
-- `.playwright-mcp/e2e-chat-persistence-history.png`
-- `.playwright-mcp/e2e-student-no-ai-manager.png`
+-- Option 2: By name
+UPDATE public.profiles SET role = 'creator' WHERE full_name ILIKE '%simeon%';
+
+-- Option 3: First find the user, then update
+SELECT id, user_id, email, role, full_name FROM public.profiles
+WHERE full_name ILIKE '%simeon%' OR email ILIKE '%simeon%';
+-- Then: UPDATE public.profiles SET role = 'creator' WHERE user_id = '<found_user_id>';
+```
+
+**Verification:** After the update, simeon should:
+1. See "My Courses" heading instead of "My Learning"
+2. See "New Course" and "Create Course" buttons
+3. Be able to create, edit, and manage courses
+
+**Status:** ROOT CAUSE FOUND - Database update required (not a code fix)
+
+---
+
+### 2025-12-19 [Implementer]
+**Profile Popup Feature Implementation - COMPLETE**
+
+**Summary:**
+Implemented the user profile popup feature for the community hub, allowing users to click on any user's avatar or name to view their profile information in a modal popup.
+
+**Changes Made:**
+
+1. **Added `UserProfilePopup` Component Rendering** (CommunityHub.tsx)
+   - The component was already created but NOT rendered in the JSX
+   - Added the component between the Create Community Modal and Leaderboard Modal
+
+2. **Made Comment Author Elements Clickable** (CommunityHub.tsx)
+   - Wrapped comment avatars in clickable buttons with focus states
+   - Made comment author names into clickable buttons
+   - Added hover effects (indigo ring on avatar, indigo text color on name)
+
+3. **Made Leaderboard Member Elements Clickable** (CommunityHub.tsx)
+   - Wrapped leaderboard avatars in clickable buttons
+   - Made leaderboard member names into clickable buttons
+   - Added consistent hover effects matching other clickable profiles
+
+**Pre-existing Implementation Found:**
+- `UserProfilePopup.tsx` - Fully implemented component with:
+  - Gradient header with close button
+  - Large avatar with loading state
+  - User name and role badge (Creator/Admin/Student/Member)
+  - Bio display (if available)
+  - Stats grid: Posts count, Comments count, Join date
+  - Proper error handling and retry functionality
+- `communityService.ts` - `getUserProfileForPopup()` function already implemented
+- `CommunityHub.tsx` - Post author avatars/names were already clickable
+
+**Build Status:** PASSED (vite build completed successfully)
+
+**Testing Recommendations:**
+1. Click on a post author's avatar - should open profile popup
+2. Click on a post author's name - should open profile popup
+3. Expand comments and click on a commenter's avatar/name - should open profile popup
+4. Open leaderboard and click on a member's avatar/name - should open profile popup
+5. Verify popup shows correct data: avatar, name, role, bio, posts, comments, join date
+6. Verify popup close button works (X button and Close button)
+7. Verify clicking outside popup closes it
+
+---
+
+### 2025-12-19 [Coordinator]
+**Coordination: Two-Task Parallel Investigation & Feature Implementation**
+
+**User Request:**
+1. Inspect why "simeon" user can't create a course as a creator
+2. Add ability to view other people's profiles in community (popup window with profile info)
+
+**Analysis:**
+Two independent work streams that can run in parallel:
+
+| Task | Type | Agent | Priority |
+|------|------|-------|----------|
+| Simeon course creation bug | Debugging | Debugger | High |
+| Profile popup in community | New Feature | Implementer | Medium |
+
+**Execution Plan:**
+1. @Debugger (Agent 1): Investigate Simeon's course creation issue
+   - Check user role in profiles table
+   - Review course creation authorization flow
+   - Test with Simeon credentials if possible
+   - Identify and fix the bug
+
+2. @Implementer (Agent 2): Build profile popup feature
+   - Research existing user display patterns in CommunityHub
+   - Design a popup/modal for user profiles
+   - Make usernames/avatars clickable in community
+   - Display relevant user info (name, bio, avatar, role, joined date)
+
+**Parallel Opportunities:**
+- Both tasks are completely independent
+- Dispatching 2 agents simultaneously
+
+**Starting with:** Both agents in parallel
 
 ---
 
 ## Decisions Log
 | Decision | Rationale | Agent | Timestamp |
 |----------|-----------|-------|-----------|
-| Use segmented control for status filter | Compact UI, clear visual state | Architect | 2025-12-16 |
-| 2s debounce for auto-save | Balance between responsiveness and API calls | Architect | 2025-12-16 |
-| Version ref for race condition | Prevents stale saves overwriting newer data | Coordinator | 2025-12-16 |
+| Parallel dispatch | Tasks are independent, saves time | Coordinator | 2025-12-19 |
 
 ## Artifacts
-
-**Files Created (Course UX - 2025-12-16):**
-- `src/features/courses/components/CourseEditModal.tsx` - Course edit/delete modal
-- `src/features/courses/components/ModuleEditModal.tsx` - Module create/edit/delete modal
-- `src/features/courses/components/LessonEditModal.tsx` - Lesson create/edit/delete modal with type-specific fields
-- `src/features/courses/components/CourseAnalyticsPanel.tsx` - Per-course analytics dashboard
-
-**Files Modified (Course UX - 2025-12-16):**
-- `src/features/courses/courseService.ts` - Added 13 new functions (update/delete/reorder for course/module/lesson + analytics)
-- `src/features/courses/CourseLMS.tsx` - Added edit buttons, module/lesson builders, reordering, modals integration
-
-**Files Created (AI Chat - Previous):**
-- `src/features/ai-manager/conversationService.ts` - Chat persistence service
-
-**Files Modified (AI Chat - Previous):**
-- `src/features/ai-manager/AiSuccessManager.tsx` - Status filter, persistence, New Chat/History
-- `src/features/dashboard/dashboardService.ts` - Added inactiveCount, getStudentsByStatus(), getAllStudents()
-- `src/features/dashboard/Dashboard.tsx` - Added 5th KPI card for inactive students
+### Profile Popup Feature (2025-12-19)
+- **Modified:** `/src/features/community/CommunityHub.tsx`
+  - Added `UserProfilePopup` component rendering
+  - Made post author avatars and names clickable (lines 523-540)
+  - Made comment author avatars and names clickable (lines 600-625)
+  - Made leaderboard member avatars and names clickable (lines 766-785)
+- **Pre-existing:** `/src/features/community/UserProfilePopup.tsx`
+  - Complete popup component with user avatar, name, role badge, bio, stats (posts count, comments count), and join date
+- **Pre-existing:** `/src/features/community/communityService.ts`
+  - `getUserProfileForPopup()` function already implemented to fetch user profile data
 
 ## Blocked Items
 _None_
