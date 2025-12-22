@@ -1,4 +1,4 @@
-import React, { useState, useCallback } from 'react';
+import React, { useState, useCallback, useEffect } from 'react';
 import { BrowserRouter, Routes, Route, Navigate, useLocation, useNavigate } from 'react-router-dom';
 import { Menu } from 'lucide-react';
 import { AuthProvider, useAuth } from './core/contexts/AuthContext';
@@ -6,10 +6,10 @@ import { CommunityProvider } from './core/contexts/CommunityContext';
 
 // Public components
 import LandingPage from './public-pages/LandingPage';
-import LoginForm from './public-pages/auth/LoginForm';
-import SignupForm from './public-pages/auth/SignupForm';
+import { LoginPage, SignupPage } from './features/auth';
 import { CommunityLandingPage } from './public-pages/communities/CommunityLandingPage';
 import { CommunitiesDirectory } from './public-pages/communities/CommunitiesDirectory';
+import { LandingPage as CourseCatalogPage } from './features/landing';
 
 // Protected components
 import ProtectedRoute from './public-pages/auth/ProtectedRoute';
@@ -21,7 +21,7 @@ import CourseLMS from './features/courses/CourseLMS';
 import CalendarView from './features/calendar/CalendarView';
 import AiSuccessManager from './features/ai-manager/AiSuccessManager';
 import Settings from './features/settings/Settings';
-import { View } from './core/types';
+import { View, UserRole } from './core/types';
 
 // Loading component
 const LoadingScreen: React.FC = () => (
@@ -33,13 +33,47 @@ const LoadingScreen: React.FC = () => (
   </div>
 );
 
+// Map URL path to View enum
+const pathToView = (pathname: string): View => {
+  if (pathname.includes('/dashboard') || pathname === '/app') {
+    return View.DASHBOARD;
+  }
+  if (pathname.includes('/community') && !pathname.includes('/communities')) {
+    return View.COMMUNITY;
+  }
+  if (pathname.includes('/courses')) {
+    return View.COURSES;
+  }
+  if (pathname.includes('/calendar')) {
+    return View.CALENDAR;
+  }
+  if (pathname.includes('/ai-manager')) {
+    return View.AI_MANAGER;
+  }
+  if (pathname.includes('/settings')) {
+    return View.SETTINGS;
+  }
+  return View.DASHBOARD;
+};
+
 // Protected App Layout with Sidebar and View Switching
 const AppLayout: React.FC = () => {
   const { role } = useAuth();
   const navigate = useNavigate();
-  const [currentView, setCurrentView] = useState<View>(View.DASHBOARD);
+  const location = useLocation();
+
+  // Initialize view based on current URL
+  const [currentView, setCurrentView] = useState<View>(() => pathToView(location.pathname));
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const [showCreateCommunityModal, setShowCreateCommunityModal] = useState(false);
+
+  // Sync view with URL changes
+  useEffect(() => {
+    const newView = pathToView(location.pathname);
+    if (newView !== currentView) {
+      setCurrentView(newView);
+    }
+  }, [location.pathname]);
 
   // Check if user is a student (not creator or superadmin)
   const isStudent = role === 'student' || role === 'member';
@@ -136,9 +170,21 @@ const AppLayout: React.FC = () => {
   );
 };
 
+// Helper function to get the default redirect path based on user role
+export const getDefaultRedirectPath = (role: UserRole | null): string => {
+  if (role === 'creator' || role === 'superadmin') {
+    return '/dashboard';
+  }
+  // Students and members go to courses
+  return '/courses';
+};
+
 // Wrapper component to handle auth-based redirects for protected routes
-const ProtectedRouteWrapper: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  const { user, isLoading } = useAuth();
+const ProtectedRouteWrapper: React.FC<{
+  children: React.ReactNode;
+  allowedRoles?: UserRole[];
+}> = ({ children, allowedRoles }) => {
+  const { user, role, isLoading } = useAuth();
   const location = useLocation();
 
   if (isLoading) {
@@ -151,7 +197,26 @@ const ProtectedRouteWrapper: React.FC<{ children: React.ReactNode }> = ({ childr
     return <Navigate to={`/login?return=${returnUrl}`} replace />;
   }
 
-  return <ProtectedRoute>{children}</ProtectedRoute>;
+  return <ProtectedRoute allowedRoles={allowedRoles}>{children}</ProtectedRoute>;
+};
+
+// Component to redirect authenticated users to their role-based default route
+const AuthenticatedRedirect: React.FC = () => {
+  const { user, role, isLoading } = useAuth();
+  const navigate = useNavigate();
+
+  useEffect(() => {
+    if (!isLoading && user) {
+      navigate(getDefaultRedirectPath(role), { replace: true });
+    }
+  }, [user, role, isLoading, navigate]);
+
+  if (isLoading) {
+    return <LoadingScreen />;
+  }
+
+  // If not authenticated, show landing page
+  return <LandingPage onGetStarted={() => window.location.href = '/signup'} />;
 };
 
 // Main routing component
@@ -165,13 +230,14 @@ const AppRoutes: React.FC = () => {
   return (
     <Routes>
       {/* Public routes */}
-      <Route path="/" element={<LandingPage onGetStarted={() => window.location.href = '/signup'} />} />
-      <Route path="/login" element={<LoginForm />} />
-      <Route path="/signup" element={<SignupForm />} />
+      <Route path="/" element={<AuthenticatedRedirect />} />
+      <Route path="/explore" element={<CourseCatalogPage />} />
+      <Route path="/login" element={<LoginPage />} />
+      <Route path="/signup" element={<SignupPage />} />
       <Route path="/communities" element={<CommunitiesDirectory />} />
       <Route path="/community/:communityId" element={<CommunityLandingPage />} />
 
-      {/* Protected routes */}
+      {/* Protected routes - Main app layout */}
       <Route
         path="/app/*"
         element={
@@ -183,8 +249,70 @@ const AppRoutes: React.FC = () => {
         }
       />
 
-      {/* Redirect /app to /app/dashboard */}
-      <Route path="/app" element={<Navigate to="/app/dashboard" replace />} />
+      {/* Direct protected routes that redirect to app layout */}
+      <Route
+        path="/dashboard"
+        element={
+          <ProtectedRouteWrapper allowedRoles={['creator', 'superadmin']}>
+            <CommunityProvider>
+              <AppLayout />
+            </CommunityProvider>
+          </ProtectedRouteWrapper>
+        }
+      />
+      <Route
+        path="/courses"
+        element={
+          <ProtectedRouteWrapper>
+            <CommunityProvider>
+              <AppLayout />
+            </CommunityProvider>
+          </ProtectedRouteWrapper>
+        }
+      />
+      <Route
+        path="/community"
+        element={
+          <ProtectedRouteWrapper>
+            <CommunityProvider>
+              <AppLayout />
+            </CommunityProvider>
+          </ProtectedRouteWrapper>
+        }
+      />
+      <Route
+        path="/calendar"
+        element={
+          <ProtectedRouteWrapper>
+            <CommunityProvider>
+              <AppLayout />
+            </CommunityProvider>
+          </ProtectedRouteWrapper>
+        }
+      />
+      <Route
+        path="/ai-manager"
+        element={
+          <ProtectedRouteWrapper allowedRoles={['creator', 'superadmin']}>
+            <CommunityProvider>
+              <AppLayout />
+            </CommunityProvider>
+          </ProtectedRouteWrapper>
+        }
+      />
+      <Route
+        path="/settings"
+        element={
+          <ProtectedRouteWrapper>
+            <CommunityProvider>
+              <AppLayout />
+            </CommunityProvider>
+          </ProtectedRouteWrapper>
+        }
+      />
+
+      {/* Legacy redirect /app to role-based default */}
+      <Route path="/app" element={<Navigate to="/dashboard" replace />} />
 
       {/* Catch-all redirect to home */}
       <Route path="*" element={<Navigate to="/" replace />} />

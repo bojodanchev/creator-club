@@ -3,13 +3,14 @@ import { useNavigate, useSearchParams } from 'react-router-dom';
 import { UserPlus, Mail, Lock, User, AlertCircle, CheckCircle } from 'lucide-react';
 import { useAuth } from '../../core/contexts/AuthContext';
 import { UserRole } from '../../core/types';
+import { getDefaultRedirectPath } from '../../App';
 
 interface SignupFormProps {
   onToggleForm?: () => void;
 }
 
 const SignupForm: React.FC<SignupFormProps> = ({ onToggleForm }) => {
-  const { signUp, user } = useAuth();
+  const { signUp, user, role: userRole } = useAuth();
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const returnUrl = searchParams.get('return');
@@ -23,16 +24,17 @@ const SignupForm: React.FC<SignupFormProps> = ({ onToggleForm }) => {
   const [success, setSuccess] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
 
-  // Redirect if already authenticated
+  // Redirect if already authenticated - role-based redirect
   useEffect(() => {
     if (user && !success) {
       if (returnUrl) {
         navigate(decodeURIComponent(returnUrl));
       } else {
-        navigate('/app');
+        // Role-based redirect: creators -> /dashboard, students -> /courses
+        navigate(getDefaultRedirectPath(userRole));
       }
     }
-  }, [user, success, returnUrl, navigate]);
+  }, [user, userRole, success, returnUrl, navigate]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();

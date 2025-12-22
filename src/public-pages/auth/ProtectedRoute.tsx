@@ -1,6 +1,8 @@
 import React from 'react';
+import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../../core/contexts/AuthContext';
 import { UserRole } from '../../core/types';
+import { getDefaultRedirectPath } from '../../App';
 
 interface ProtectedRouteProps {
   children: React.ReactNode;
@@ -14,6 +16,7 @@ const ProtectedRoute: React.FC<ProtectedRouteProps> = ({
   fallback
 }) => {
   const { user, role, isLoading } = useAuth();
+  const navigate = useNavigate();
 
   // Show loading state
   if (isLoading) {
@@ -62,6 +65,12 @@ const ProtectedRoute: React.FC<ProtectedRouteProps> = ({
           <p className="text-slate-500 text-sm">
             Your role: {role}
           </p>
+          <button
+            onClick={() => navigate(getDefaultRedirectPath(role))}
+            className="mt-6 px-6 py-2 bg-indigo-500 hover:bg-indigo-600 text-white rounded-lg font-medium transition-colors"
+          >
+            Go to my homepage
+          </button>
         </div>
       </div>
     );
