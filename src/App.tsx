@@ -21,7 +21,12 @@ import CourseLMS from './features/courses/CourseLMS';
 import CalendarView from './features/calendar/CalendarView';
 import AiSuccessManager from './features/ai-manager/AiSuccessManager';
 import Settings from './features/settings/Settings';
+import HomeworkPage from './features/homework/HomeworkPage';
+import HomeworkManagement from './features/homework/HomeworkManagement';
+import ChatbotsPage from './features/chatbots/ChatbotsPage';
+// Note: StudentManagerPage will be created in Task 4.3
 import { View, UserRole } from './core/types';
+import { useCommunity } from './core/contexts/CommunityContext';
 
 // Loading component
 const LoadingScreen: React.FC = () => (
@@ -44,11 +49,20 @@ const pathToView = (pathname: string): View => {
   if (pathname.includes('/courses')) {
     return View.COURSES;
   }
+  if (pathname.includes('/homework')) {
+    return View.HOMEWORK;
+  }
+  if (pathname.includes('/ai-chat')) {
+    return View.AI_CHAT;
+  }
   if (pathname.includes('/calendar')) {
     return View.CALENDAR;
   }
   if (pathname.includes('/ai-manager')) {
     return View.AI_MANAGER;
+  }
+  if (pathname.includes('/student-manager')) {
+    return View.STUDENT_MANAGER;
   }
   if (pathname.includes('/settings')) {
     return View.SETTINGS;
@@ -58,9 +72,17 @@ const pathToView = (pathname: string): View => {
 
 // Protected App Layout with Sidebar and View Switching
 const AppLayout: React.FC = () => {
-  const { role } = useAuth();
+  const { role, profile } = useAuth();
+  const { selectedCommunity } = useCommunity();
   const navigate = useNavigate();
   const location = useLocation();
+
+  // Check if current user is the creator of the selected community
+  const isCreatorOfCommunity = !!(
+    selectedCommunity &&
+    profile?.id &&
+    selectedCommunity.creator_id === profile.id
+  );
 
   // Initialize view based on current URL
   const [currentView, setCurrentView] = useState<View>(() => pathToView(location.pathname));
@@ -127,10 +149,40 @@ const AppLayout: React.FC = () => {
         );
       case View.COURSES:
         return <CourseLMS />;
+      case View.HOMEWORK:
+        // Creators see homework management, students see homework page
+        if (!selectedCommunity) {
+          return <div className="p-8 text-center text-slate-500">Please select a community first.</div>;
+        }
+        return isCreatorOfCommunity ? (
+          <HomeworkManagement
+            communityId={selectedCommunity.id}
+            creatorProfileId={profile!.id}
+          />
+        ) : (
+          <HomeworkPage communityId={selectedCommunity.id} />
+        );
+      case View.AI_CHAT:
+        // AI Chatbots page - available to all users
+        if (!selectedCommunity) {
+          return <div className="p-8 text-center text-slate-500">Please select a community first.</div>;
+        }
+        return <ChatbotsPage communityId={selectedCommunity.id} />;
       case View.CALENDAR:
         return <CalendarView />;
       case View.AI_MANAGER:
         return <AiSuccessManager />;
+      case View.STUDENT_MANAGER:
+        // Student Manager - creators only (placeholder for Task 4.3)
+        if (!isCreatorOfCommunity) {
+          return <div className="p-8 text-center text-slate-500">Access restricted to community creators.</div>;
+        }
+        return (
+          <div className="p-8 text-center">
+            <h2 className="text-2xl font-bold text-slate-800 mb-4">Student Manager</h2>
+            <p className="text-slate-500">Coming Soon - This feature will be available in the next update.</p>
+          </div>
+        );
       case View.SETTINGS:
         return <Settings />;
       default:
