@@ -227,25 +227,45 @@ export async function submitHomework(
 export async function getSubmissionsForAssignment(
   assignmentId: string
 ): Promise<DbHomeworkSubmissionWithStudent[]> {
-  const { data, error } = await supabase
+  // First, fetch submissions
+  const { data: submissions, error: submissionsError } = await supabase
     .from('homework_submissions')
-    .select(`
-      *,
-      student:profiles!student_id(id, user_id, full_name, avatar_url, email, role)
-    `)
+    .select('*')
     .eq('assignment_id', assignmentId)
     .order('submitted_at', { ascending: false });
 
-  if (error) {
-    console.error('Error fetching submissions:', error);
+  if (submissionsError) {
+    console.error('Error fetching submissions:', submissionsError);
     return [];
   }
 
-  // Transform to match expected type
-  return (data || []).map((sub) => ({
+  if (!submissions || submissions.length === 0) {
+    return [];
+  }
+
+  // Get unique student IDs (these are auth user IDs)
+  const studentIds = [...new Set(submissions.map((s) => s.student_id))];
+
+  // Fetch profiles for these students (matching on user_id)
+  const { data: profiles, error: profilesError } = await supabase
+    .from('profiles')
+    .select('id, user_id, full_name, avatar_url, email, role')
+    .in('user_id', studentIds);
+
+  if (profilesError) {
+    console.error('Error fetching profiles:', profilesError);
+  }
+
+  // Create a map of user_id to profile
+  const profileMap = new Map(
+    (profiles || []).map((p) => [p.user_id, p])
+  );
+
+  // Combine submissions with student profiles
+  return submissions.map((sub) => ({
     ...sub,
-    student: sub.student as unknown as DbProfile,
-  }));
+    student: profileMap.get(sub.student_id) as DbProfile | undefined,
+  })) as DbHomeworkSubmissionWithStudent[];
 }
 
 /**
