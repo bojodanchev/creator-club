@@ -24,7 +24,7 @@ import Settings from './features/settings/Settings';
 import HomeworkPage from './features/homework/HomeworkPage';
 import HomeworkManagement from './features/homework/HomeworkManagement';
 import ChatbotsPage from './features/chatbots/ChatbotsPage';
-// Note: StudentManagerPage will be created in Task 4.3
+import { StudentManagerPage } from './features/student-manager';
 import { View, UserRole } from './core/types';
 import { useCommunity } from './core/contexts/CommunityContext';
 
@@ -173,16 +173,14 @@ const AppLayout: React.FC = () => {
       case View.AI_MANAGER:
         return <AiSuccessManager />;
       case View.STUDENT_MANAGER:
-        // Student Manager - creators only (placeholder for Task 4.3)
+        // Student Manager - creators only
+        if (!selectedCommunity) {
+          return <div className="p-8 text-center text-slate-500">Please select a community first.</div>;
+        }
         if (!isCreatorOfCommunity) {
           return <div className="p-8 text-center text-slate-500">Access restricted to community creators.</div>;
         }
-        return (
-          <div className="p-8 text-center">
-            <h2 className="text-2xl font-bold text-slate-800 mb-4">Student Manager</h2>
-            <p className="text-slate-500">Coming Soon - This feature will be available in the next update.</p>
-          </div>
-        );
+        return <StudentManagerPage communityId={selectedCommunity.id} />;
       case View.SETTINGS:
         return <Settings />;
       default:
