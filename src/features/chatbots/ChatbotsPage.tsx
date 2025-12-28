@@ -125,8 +125,8 @@ const ChatbotsPage: React.FC<ChatbotsPageProps> = ({ communityId }) => {
       </div>
 
       {/* Chat Area */}
-      <div className="flex-1 max-w-5xl w-full mx-auto">
-        <div className="h-[calc(100vh-220px)] bg-white border-x border-b border-slate-200">
+      <div className="flex-1 max-w-5xl w-full mx-auto px-6 py-5">
+        <div className="h-[calc(100vh-270px)] bg-white border border-slate-200 rounded-2xl shadow-md overflow-hidden">
           {selectedChatbot && (
             <ChatbotConversation
               key={selectedChatbot.id}
