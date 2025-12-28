@@ -236,3 +236,63 @@ export interface DbTask {
   created_at: string;
   updated_at: string;
 }
+
+// Community Chatbots
+export interface DbCommunityChatbot {
+  id: string;
+  community_id: string;
+  name: string;
+  role: 'qa' | 'motivation' | 'support';
+  system_prompt: string | null;
+  personality: string | null;
+  greeting_message: string | null;
+  is_active: boolean;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface DbChatbotConversation {
+  id: string;
+  chatbot_id: string;
+  user_id: string;
+  messages: { role: 'user' | 'model'; text: string; timestamp: string }[];
+  created_at: string;
+  updated_at: string;
+}
+
+// Homework System
+export interface DbHomeworkAssignment {
+  id: string;
+  community_id: string;
+  creator_id: string;
+  title: string;
+  description: string | null;
+  max_points: number;
+  due_date: string | null;
+  is_published: boolean;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface DbHomeworkSubmission {
+  id: string;
+  assignment_id: string;
+  student_id: string;
+  text_response: string | null;
+  file_urls: string[];
+  status: 'pending' | 'graded';
+  points_awarded: number | null;
+  feedback: string | null;
+  submitted_at: string;
+  graded_at: string | null;
+  graded_by: string | null;
+}
+
+export interface DbHomeworkSubmissionWithStudent extends DbHomeworkSubmission {
+  student: DbProfile;
+}
+
+export interface DbHomeworkAssignmentWithStats extends DbHomeworkAssignment {
+  total_submissions: number;
+  pending_count: number;
+}
