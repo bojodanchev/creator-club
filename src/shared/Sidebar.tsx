@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { LayoutDashboard, Users, GraduationCap, Calendar, BrainCircuit, Settings, LogOut, Menu, Plus, ClipboardList, Bot, UserCog } from 'lucide-react';
 import { View } from '../core/types';
-import { NAV_ITEMS } from '../core/constants';
+import { NAV_ITEMS, CREATOR_NAV_ITEMS } from '../core/constants';
 import { useAuth } from '../core/contexts/AuthContext';
 import CommunitySwitcher from './CommunitySwitcher';
 
@@ -34,7 +34,7 @@ const Sidebar: React.FC<SidebarProps> = ({ currentView, setCurrentView, isOpen, 
 
   // Filter and modify nav items based on role
   const getNavItems = () => {
-    return NAV_ITEMS
+    const baseItems = NAV_ITEMS
       .filter(item => {
         // Hide AI Success Manager for students
         if (isStudent && item.id === View.AI_MANAGER) return false;
@@ -47,6 +47,13 @@ const Sidebar: React.FC<SidebarProps> = ({ currentView, setCurrentView, isOpen, 
         }
         return item;
       });
+
+    // Add creator-only nav items for creators
+    if (isCreator) {
+      return [...baseItems, ...CREATOR_NAV_ITEMS];
+    }
+
+    return baseItems;
   };
 
   const handleSignOut = async () => {
