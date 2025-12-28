@@ -306,7 +306,8 @@ export async function getPosts(channelId: string): Promise<DbPostWithAuthor[]> {
 export async function createPost(
   channelId: string,
   userId: string,
-  content: string
+  content: string,
+  imageUrl?: string | null
 ): Promise<DbPost | null> {
   // First, get the profile ID for this user (FK references profiles.id, not user_id)
   const { data: profile, error: profileError } = await supabase
@@ -326,6 +327,7 @@ export async function createPost(
       channel_id: channelId,
       author_id: profile.id,
       content,
+      image_url: imageUrl || null,
     })
     .select()
     .single();
@@ -335,6 +337,30 @@ export async function createPost(
     return null;
   }
   return data;
+}
+
+export async function uploadPostImage(file: File, channelId: string): Promise<string | null> {
+  const fileExt = file.name.split('.').pop();
+  const fileName = `${channelId}/${Date.now()}-${Math.random().toString(36).substring(7)}.${fileExt}`;
+
+  const { data, error } = await supabase.storage
+    .from('post-images')
+    .upload(fileName, file, {
+      cacheControl: '3600',
+      upsert: false,
+    });
+
+  if (error) {
+    console.error('Error uploading image:', error);
+    return null;
+  }
+
+  // Get public URL
+  const { data: urlData } = supabase.storage
+    .from('post-images')
+    .getPublicUrl(data.path);
+
+  return urlData.publicUrl;
 }
 
 export async function deletePost(postId: string): Promise<boolean> {

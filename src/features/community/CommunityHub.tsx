@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Heart, MessageSquare, MoreHorizontal, Image as ImageIcon, Smile, Send, Plus, Users, Loader2, Trophy, Star, Zap, Pin, Trash2, Copy, Flag, Edit3 } from 'lucide-react';
+import { Heart, MessageSquare, MoreHorizontal, Image as ImageIcon, Smile, Send, Plus, Users, Loader2, Trophy, Star, Zap, Pin, Trash2, Copy, Flag, Edit3, X } from 'lucide-react';
 import { useAuth } from '../../core/contexts/AuthContext';
 import { useCommunity } from '../../core/contexts/CommunityContext';
 import {
@@ -15,6 +15,7 @@ import {
   createComment,
   deletePost,
   togglePinPost,
+  uploadPostImage,
 } from './communityService';
 import UserProfilePopup from './UserProfilePopup';
 import {
@@ -68,6 +69,9 @@ const CommunityHub: React.FC<CommunityHubProps> = ({ showCreateModal = false, on
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [showEmojiPicker, setShowEmojiPicker] = useState(false);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
+  const [pendingImage, setPendingImage] = useState<File | null>(null);
+  const [pendingImagePreview, setPendingImagePreview] = useState<string | null>(null);
+  const [isUploadingImage, setIsUploadingImage] = useState(false);
 
   // Handle external showCreateModal prop
   useEffect(() => {
@@ -154,13 +158,26 @@ const CommunityHub: React.FC<CommunityHubProps> = ({ showCreateModal = false, on
   };
 
   const handleCreatePost = async () => {
-    if (!user || !selectedChannel || !newPost.trim() || !selectedCommunity || !profile) return;
+    if (!user || !selectedChannel || !selectedCommunity || !profile) return;
+    // Must have either text content or an image
+    if (!newPost.trim() && !pendingImage) return;
 
     setIsPostingLoading(true);
     try {
-      const post = await createPost(selectedChannel.id, user.id, newPost.trim());
+      let imageUrl: string | null = null;
+
+      // Upload image if present
+      if (pendingImage) {
+        setIsUploadingImage(true);
+        imageUrl = await uploadPostImage(pendingImage, selectedChannel.id);
+        setIsUploadingImage(false);
+      }
+
+      const post = await createPost(selectedChannel.id, user.id, newPost.trim(), imageUrl);
       if (post) {
         setNewPost('');
+        setPendingImage(null);
+        setPendingImagePreview(null);
         // Award points for creating a post (using profile.id for FK compatibility)
         await awardPoints(profile.id, selectedCommunity.id, 10, 'Created a post');
         // Reload posts to get the full post with author
@@ -171,6 +188,7 @@ const CommunityHub: React.FC<CommunityHubProps> = ({ showCreateModal = false, on
       }
     } finally {
       setIsPostingLoading(false);
+      setIsUploadingImage(false);
     }
   };
 
@@ -337,15 +355,23 @@ const CommunityHub: React.FC<CommunityHubProps> = ({ showCreateModal = false, on
     const file = e.target.files?.[0];
     if (!file) return;
 
-    // For now, we'll show a placeholder message since image upload requires storage setup
-    // In a full implementation, this would upload to Supabase Storage
-    const imagePlaceholder = `[Image: ${file.name}]`;
-    setNewPost(prev => prev + (prev ? '\n' : '') + imagePlaceholder);
+    // Create preview
+    const reader = new FileReader();
+    reader.onload = (event) => {
+      setPendingImagePreview(event.target?.result as string);
+    };
+    reader.readAsDataURL(file);
+    setPendingImage(file);
 
     // Reset file input
     if (fileInputRef.current) {
       fileInputRef.current.value = '';
     }
+  };
+
+  const handleRemoveImage = () => {
+    setPendingImage(null);
+    setPendingImagePreview(null);
   };
 
   const handleEmojiClick = (emoji: string) => {
@@ -568,6 +594,25 @@ const CommunityHub: React.FC<CommunityHubProps> = ({ showCreateModal = false, on
                   placeholder="Share something with the club..."
                   className="w-full bg-slate-50 border-none rounded-lg p-3 text-sm focus:ring-2 focus:ring-indigo-500 resize-none h-24"
                 />
+
+                {/* Image Preview */}
+                {pendingImagePreview && (
+                  <div className="relative mt-3 inline-block">
+                    <img
+                      src={pendingImagePreview}
+                      alt="Upload preview"
+                      className="max-h-48 rounded-lg border border-slate-200"
+                    />
+                    <button
+                      onClick={handleRemoveImage}
+                      className="absolute -top-2 -right-2 bg-slate-800 text-white p-1 rounded-full hover:bg-slate-700 transition-colors"
+                      title="Remove image"
+                    >
+                      <X size={14} />
+                    </button>
+                  </div>
+                )}
+
                 <div className="flex justify-between items-center mt-3">
                   <div className="flex gap-2 relative">
                     {/* Hidden file input for image upload */}
@@ -580,7 +625,7 @@ const CommunityHub: React.FC<CommunityHubProps> = ({ showCreateModal = false, on
                     />
                     <button
                       onClick={handleImageClick}
-                      className="p-2 text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-full transition-colors"
+                      className={`p-2 rounded-full transition-colors ${pendingImage ? 'text-indigo-600 bg-indigo-50' : 'text-slate-400 hover:text-indigo-600 hover:bg-indigo-50'}`}
                       title="Add image"
                     >
                       <ImageIcon size={20} />
@@ -593,17 +638,17 @@ const CommunityHub: React.FC<CommunityHubProps> = ({ showCreateModal = false, on
                       <Smile size={20} />
                     </button>
 
-                    {/* Emoji Picker */}
+                    {/* Emoji Picker - Opens above the button */}
                     {showEmojiPicker && (
                       <>
                         <div className="fixed inset-0 z-10" onClick={() => setShowEmojiPicker(false)} />
-                        <div className="absolute left-0 bottom-12 bg-white rounded-lg shadow-lg border border-slate-200 p-3 z-20">
-                          <div className="grid grid-cols-8 gap-1">
+                        <div className="absolute left-8 top-0 transform -translate-y-full mb-2 bg-white rounded-xl shadow-xl border border-slate-200 p-3 z-20">
+                          <div className="grid grid-cols-8 gap-2">
                             {commonEmojis.map((emoji) => (
                               <button
                                 key={emoji}
                                 onClick={() => handleEmojiClick(emoji)}
-                                className="w-8 h-8 flex items-center justify-center hover:bg-slate-100 rounded transition-colors text-xl"
+                                className="w-9 h-9 flex items-center justify-center hover:bg-slate-100 rounded-lg transition-colors text-2xl"
                               >
                                 {emoji}
                               </button>
@@ -615,15 +660,20 @@ const CommunityHub: React.FC<CommunityHubProps> = ({ showCreateModal = false, on
                   </div>
                   <button
                     onClick={handleCreatePost}
-                    disabled={!newPost.trim() || isPostingLoading}
+                    disabled={(!newPost.trim() && !pendingImage) || isPostingLoading}
                     className="bg-indigo-600 text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-indigo-700 flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
                   >
                     {isPostingLoading ? (
-                      <Loader2 size={16} className="animate-spin" />
+                      <>
+                        <Loader2 size={16} className="animate-spin" />
+                        {isUploadingImage ? 'Uploading...' : 'Posting...'}
+                      </>
                     ) : (
-                      <Send size={16} />
+                      <>
+                        <Send size={16} />
+                        Post
+                      </>
                     )}
-                    Post
                   </button>
                 </div>
               </div>
@@ -743,9 +793,24 @@ const CommunityHub: React.FC<CommunityHubProps> = ({ showCreateModal = false, on
                 </div>
               </div>
 
-              <div className="mt-4 text-slate-700 leading-relaxed whitespace-pre-wrap">
-                {post.content}
-              </div>
+              {/* Post Content */}
+              {post.content && (
+                <div className="mt-4 text-slate-700 leading-relaxed whitespace-pre-wrap">
+                  {post.content}
+                </div>
+              )}
+
+              {/* Post Image */}
+              {post.image_url && (
+                <div className="mt-4">
+                  <img
+                    src={post.image_url}
+                    alt="Post image"
+                    className="max-w-full rounded-lg border border-slate-200 cursor-pointer hover:opacity-95 transition-opacity"
+                    onClick={() => window.open(post.image_url!, '_blank')}
+                  />
+                </div>
+              )}
 
               <div className="mt-5 pt-4 border-t border-slate-50 flex gap-6">
                 <button
