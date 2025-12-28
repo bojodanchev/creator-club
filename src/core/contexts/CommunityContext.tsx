@@ -15,13 +15,25 @@ interface CommunityContextType {
   refreshCommunities: () => Promise<void>;
 }
 
+const STORAGE_KEY = 'creator-club-selected-community';
+
 const CommunityContext = createContext<CommunityContextType | undefined>(undefined);
 
 export const CommunityProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
   const { user, role } = useAuth();
   const [communities, setCommunities] = useState<DbCommunity[]>([]);
-  const [selectedCommunity, setSelectedCommunity] = useState<DbCommunity | null>(null);
+  const [selectedCommunity, setSelectedCommunityState] = useState<DbCommunity | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+
+  // Wrapper to persist selected community to localStorage
+  const setSelectedCommunity = (community: DbCommunity | null) => {
+    setSelectedCommunityState(community);
+    if (community) {
+      localStorage.setItem(STORAGE_KEY, community.id);
+    } else {
+      localStorage.removeItem(STORAGE_KEY);
+    }
+  };
 
   const loadCommunities = async () => {
     if (!user) {
@@ -50,10 +62,17 @@ export const CommunityProvider: React.FC<{ children: ReactNode }> = ({ children 
 
       setCommunities(communityList);
 
-      // Auto-select first community if none selected or current selection not in list
+      // Restore from localStorage or auto-select first community
       if (communityList.length > 0) {
+        const storedId = localStorage.getItem(STORAGE_KEY);
+        const storedCommunity = storedId ? communityList.find(c => c.id === storedId) : null;
         const currentStillExists = selectedCommunity && communityList.some(c => c.id === selectedCommunity.id);
-        if (!currentStillExists) {
+
+        if (storedCommunity && !selectedCommunity) {
+          // Restore from localStorage on initial load
+          setSelectedCommunityState(storedCommunity);
+        } else if (!currentStillExists) {
+          // Fall back to first community if current selection is invalid
           setSelectedCommunity(communityList[0]);
         }
       } else {

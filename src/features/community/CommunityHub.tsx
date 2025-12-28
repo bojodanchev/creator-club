@@ -1,5 +1,5 @@
-import React, { useState, useEffect } from 'react';
-import { Heart, MessageSquare, MoreHorizontal, Image as ImageIcon, Smile, Send, Plus, Users, Loader2, Trophy, Star, Zap } from 'lucide-react';
+import React, { useState, useEffect, useRef } from 'react';
+import { Heart, MessageSquare, MoreHorizontal, Image as ImageIcon, Smile, Send, Plus, Users, Loader2, Trophy, Star, Zap, Pin, Trash2, Copy, Flag, Edit3 } from 'lucide-react';
 import { useAuth } from '../../core/contexts/AuthContext';
 import { useCommunity } from '../../core/contexts/CommunityContext';
 import {
@@ -13,6 +13,8 @@ import {
   seedDefaultChannels,
   getComments,
   createComment,
+  deletePost,
+  togglePinPost,
 } from './communityService';
 import UserProfilePopup from './UserProfilePopup';
 import {
@@ -58,6 +60,14 @@ const CommunityHub: React.FC<CommunityHubProps> = ({ showCreateModal = false, on
   // Profile popup state
   const [selectedProfileId, setSelectedProfileId] = useState<string | null>(null);
   const [showProfilePopup, setShowProfilePopup] = useState(false);
+
+  // Post menu state
+  const [openMenuPostId, setOpenMenuPostId] = useState<string | null>(null);
+
+  // Image upload and emoji picker state
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const [showEmojiPicker, setShowEmojiPicker] = useState(false);
+  const textareaRef = useRef<HTMLTextAreaElement>(null);
 
   // Handle external showCreateModal prop
   useEffect(() => {
@@ -264,6 +274,84 @@ const CommunityHub: React.FC<CommunityHubProps> = ({ showCreateModal = false, on
   const handleCloseProfile = () => {
     setShowProfilePopup(false);
     setSelectedProfileId(null);
+  };
+
+  // Post menu handlers
+  const handleToggleMenu = (postId: string) => {
+    setOpenMenuPostId(prev => prev === postId ? null : postId);
+  };
+
+  const handleCloseMenu = () => {
+    setOpenMenuPostId(null);
+  };
+
+  const handlePinPost = async (postId: string, currentlyPinned: boolean) => {
+    const success = await togglePinPost(postId, currentlyPinned);
+    if (success) {
+      // Optimistic update
+      setPosts(prev => prev.map(p =>
+        p.id === postId ? { ...p, is_pinned: !currentlyPinned } : p
+      ));
+      // Reload posts to get proper ordering
+      if (selectedChannel) {
+        await loadPosts(selectedChannel.id);
+      }
+    }
+    handleCloseMenu();
+  };
+
+  const handleDeletePost = async (postId: string) => {
+    if (!window.confirm('Are you sure you want to delete this post?')) {
+      handleCloseMenu();
+      return;
+    }
+    const success = await deletePost(postId);
+    if (success) {
+      setPosts(prev => prev.filter(p => p.id !== postId));
+    }
+    handleCloseMenu();
+  };
+
+  const handleCopyPostLink = (postId: string) => {
+    const url = `${window.location.origin}/community/post/${postId}`;
+    navigator.clipboard.writeText(url);
+    handleCloseMenu();
+  };
+
+  const handleReportPost = (postId: string) => {
+    // For now, just show an alert - can be expanded later
+    alert('Thank you for reporting. Our team will review this post.');
+    handleCloseMenu();
+  };
+
+  const isCreator = role === 'creator' || role === 'superadmin';
+
+  // Common emojis for quick picker
+  const commonEmojis = ['😀', '😂', '❤️', '👍', '🎉', '🔥', '💪', '🙌', '✨', '👏', '🚀', '💯', '🤔', '😊', '🙏', '💡'];
+
+  const handleImageClick = () => {
+    fileInputRef.current?.click();
+  };
+
+  const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    // For now, we'll show a placeholder message since image upload requires storage setup
+    // In a full implementation, this would upload to Supabase Storage
+    const imagePlaceholder = `[Image: ${file.name}]`;
+    setNewPost(prev => prev + (prev ? '\n' : '') + imagePlaceholder);
+
+    // Reset file input
+    if (fileInputRef.current) {
+      fileInputRef.current.value = '';
+    }
+  };
+
+  const handleEmojiClick = (emoji: string) => {
+    setNewPost(prev => prev + emoji);
+    setShowEmojiPicker(false);
+    textareaRef.current?.focus();
   };
 
   const formatTimestamp = (timestamp: string) => {
@@ -474,19 +562,56 @@ const CommunityHub: React.FC<CommunityHubProps> = ({ showCreateModal = false, on
               />
               <div className="flex-1">
                 <textarea
+                  ref={textareaRef}
                   value={newPost}
                   onChange={(e) => setNewPost(e.target.value)}
                   placeholder="Share something with the club..."
                   className="w-full bg-slate-50 border-none rounded-lg p-3 text-sm focus:ring-2 focus:ring-indigo-500 resize-none h-24"
                 />
                 <div className="flex justify-between items-center mt-3">
-                  <div className="flex gap-2">
-                    <button className="p-2 text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-full transition-colors">
+                  <div className="flex gap-2 relative">
+                    {/* Hidden file input for image upload */}
+                    <input
+                      ref={fileInputRef}
+                      type="file"
+                      accept="image/*"
+                      onChange={handleImageUpload}
+                      className="hidden"
+                    />
+                    <button
+                      onClick={handleImageClick}
+                      className="p-2 text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-full transition-colors"
+                      title="Add image"
+                    >
                       <ImageIcon size={20} />
                     </button>
-                    <button className="p-2 text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-full transition-colors">
+                    <button
+                      onClick={() => setShowEmojiPicker(!showEmojiPicker)}
+                      className={`p-2 rounded-full transition-colors ${showEmojiPicker ? 'text-indigo-600 bg-indigo-50' : 'text-slate-400 hover:text-indigo-600 hover:bg-indigo-50'}`}
+                      title="Add emoji"
+                    >
                       <Smile size={20} />
                     </button>
+
+                    {/* Emoji Picker */}
+                    {showEmojiPicker && (
+                      <>
+                        <div className="fixed inset-0 z-10" onClick={() => setShowEmojiPicker(false)} />
+                        <div className="absolute left-0 bottom-12 bg-white rounded-lg shadow-lg border border-slate-200 p-3 z-20">
+                          <div className="grid grid-cols-8 gap-1">
+                            {commonEmojis.map((emoji) => (
+                              <button
+                                key={emoji}
+                                onClick={() => handleEmojiClick(emoji)}
+                                className="w-8 h-8 flex items-center justify-center hover:bg-slate-100 rounded transition-colors text-xl"
+                              >
+                                {emoji}
+                              </button>
+                            ))}
+                          </div>
+                        </div>
+                      </>
+                    )}
                   </div>
                   <button
                     onClick={handleCreatePost}
@@ -517,7 +642,7 @@ const CommunityHub: React.FC<CommunityHubProps> = ({ showCreateModal = false, on
           )}
 
           {posts.map(post => (
-            <div key={post.id} className="bg-white rounded-xl shadow-sm border border-slate-100 p-5">
+            <div key={post.id} className={`bg-white rounded-xl shadow-sm border p-5 ${post.is_pinned ? 'border-amber-200 bg-amber-50/30' : 'border-slate-100'}`}>
               <div className="flex justify-between items-start">
                 <div className="flex gap-3">
                   <button
@@ -544,13 +669,78 @@ const CommunityHub: React.FC<CommunityHubProps> = ({ showCreateModal = false, on
                       {post.author?.role === 'superadmin' && (
                         <span className="bg-purple-100 text-purple-700 text-[10px] px-2 py-0.5 rounded-full font-bold">ADMIN</span>
                       )}
+                      {post.is_pinned && (
+                        <span className="bg-amber-100 text-amber-700 text-[10px] px-2 py-0.5 rounded-full font-bold flex items-center gap-1">
+                          <Pin size={10} /> PINNED
+                        </span>
+                      )}
                     </div>
                     <p className="text-xs text-slate-500">{formatTimestamp(post.created_at)}</p>
                   </div>
                 </div>
-                <button className="text-slate-400 hover:text-slate-600">
-                  <MoreHorizontal size={20} />
-                </button>
+
+                {/* Post Menu */}
+                <div className="relative">
+                  <button
+                    onClick={() => handleToggleMenu(post.id)}
+                    className="text-slate-400 hover:text-slate-600 p-1 rounded-full hover:bg-slate-100 transition-colors"
+                  >
+                    <MoreHorizontal size={20} />
+                  </button>
+
+                  {/* Dropdown Menu */}
+                  {openMenuPostId === post.id && (
+                    <>
+                      {/* Backdrop to close menu */}
+                      <div
+                        className="fixed inset-0 z-10"
+                        onClick={handleCloseMenu}
+                      />
+                      <div className="absolute right-0 top-8 bg-white rounded-lg shadow-lg border border-slate-200 py-1 z-20 min-w-[160px]">
+                        {/* Copy Link - Available to everyone */}
+                        <button
+                          onClick={() => handleCopyPostLink(post.id)}
+                          className="w-full flex items-center gap-2 px-4 py-2 text-sm text-slate-700 hover:bg-slate-50 transition-colors"
+                        >
+                          <Copy size={16} />
+                          Copy link
+                        </button>
+
+                        {/* Creator-only options */}
+                        {isCreator && (
+                          <>
+                            <button
+                              onClick={() => handlePinPost(post.id, post.is_pinned || false)}
+                              className="w-full flex items-center gap-2 px-4 py-2 text-sm text-slate-700 hover:bg-slate-50 transition-colors"
+                            >
+                              <Pin size={16} />
+                              {post.is_pinned ? 'Unpin post' : 'Pin post'}
+                            </button>
+                            <div className="border-t border-slate-100 my-1" />
+                            <button
+                              onClick={() => handleDeletePost(post.id)}
+                              className="w-full flex items-center gap-2 px-4 py-2 text-sm text-red-600 hover:bg-red-50 transition-colors"
+                            >
+                              <Trash2 size={16} />
+                              Delete post
+                            </button>
+                          </>
+                        )}
+
+                        {/* Report - Available to non-creators */}
+                        {!isCreator && (
+                          <button
+                            onClick={() => handleReportPost(post.id)}
+                            className="w-full flex items-center gap-2 px-4 py-2 text-sm text-slate-700 hover:bg-slate-50 transition-colors"
+                          >
+                            <Flag size={16} />
+                            Report
+                          </button>
+                        )}
+                      </div>
+                    </>
+                  )}
+                </div>
               </div>
 
               <div className="mt-4 text-slate-700 leading-relaxed whitespace-pre-wrap">

@@ -229,7 +229,7 @@ export async function getMembership(
 // ============================================================================
 
 export async function getPosts(channelId: string): Promise<DbPostWithAuthor[]> {
-  // First get posts with authors
+  // First get posts with authors - pinned posts first, then by date
   const { data: posts, error: postsError } = await supabase
     .from('posts')
     .select(`
@@ -237,6 +237,7 @@ export async function getPosts(channelId: string): Promise<DbPostWithAuthor[]> {
       author:profiles!author_id(*)
     `)
     .eq('channel_id', channelId)
+    .order('is_pinned', { ascending: false })
     .order('created_at', { ascending: false });
 
   if (postsError) {
@@ -347,6 +348,40 @@ export async function deletePost(postId: string): Promise<boolean> {
     return false;
   }
   return true;
+}
+
+export async function pinPost(postId: string): Promise<boolean> {
+  const { error } = await supabase
+    .from('posts')
+    .update({ is_pinned: true })
+    .eq('id', postId);
+
+  if (error) {
+    console.error('Error pinning post:', error);
+    return false;
+  }
+  return true;
+}
+
+export async function unpinPost(postId: string): Promise<boolean> {
+  const { error } = await supabase
+    .from('posts')
+    .update({ is_pinned: false })
+    .eq('id', postId);
+
+  if (error) {
+    console.error('Error unpinning post:', error);
+    return false;
+  }
+  return true;
+}
+
+export async function togglePinPost(postId: string, currentlyPinned: boolean): Promise<boolean> {
+  if (currentlyPinned) {
+    return unpinPost(postId);
+  } else {
+    return pinPost(postId);
+  }
 }
 
 // ============================================================================
