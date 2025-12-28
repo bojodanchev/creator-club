@@ -638,18 +638,25 @@ const CommunityHub: React.FC<CommunityHubProps> = ({ showCreateModal = false, on
                       <Smile size={20} />
                     </button>
 
-                    {/* Emoji Picker - Opens above the buttons */}
+                    {/* Emoji Picker - Appears above the emoji button */}
                     {showEmojiPicker && (
                       <>
-                        <div className="fixed inset-0 z-10" onClick={() => setShowEmojiPicker(false)} />
-                        <div className="fixed left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 bg-white rounded-xl shadow-2xl border border-slate-200 p-4 z-50 w-80">
-                          <p className="text-sm text-slate-600 mb-3 font-medium">Pick an emoji</p>
-                          <div className="grid grid-cols-8 gap-2">
+                        <div className="fixed inset-0 z-40" onClick={() => setShowEmojiPicker(false)} />
+                        <div
+                          className="absolute z-50 bg-white rounded-xl shadow-2xl border border-slate-200 p-3"
+                          style={{
+                            bottom: 'calc(100% + 8px)',
+                            left: '0',
+                            minWidth: '280px'
+                          }}
+                        >
+                          <p className="text-xs text-slate-500 mb-2 font-medium">Pick an emoji</p>
+                          <div className="flex flex-wrap gap-1">
                             {commonEmojis.map((emoji) => (
                               <button
                                 key={emoji}
                                 onClick={() => handleEmojiClick(emoji)}
-                                className="w-8 h-8 flex items-center justify-center hover:bg-slate-100 rounded-lg transition-colors text-2xl"
+                                className="w-9 h-9 flex items-center justify-center hover:bg-slate-100 rounded-lg transition-colors text-2xl"
                               >
                                 {emoji}
                               </button>
