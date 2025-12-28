@@ -638,17 +638,18 @@ const CommunityHub: React.FC<CommunityHubProps> = ({ showCreateModal = false, on
                       <Smile size={20} />
                     </button>
 
-                    {/* Emoji Picker - Opens above the button */}
+                    {/* Emoji Picker - Opens above the buttons */}
                     {showEmojiPicker && (
                       <>
                         <div className="fixed inset-0 z-10" onClick={() => setShowEmojiPicker(false)} />
-                        <div className="absolute left-8 top-0 transform -translate-y-full mb-2 bg-white rounded-xl shadow-xl border border-slate-200 p-3 z-20">
-                          <div className="grid grid-cols-8 gap-2">
+                        <div className="absolute left-0 bottom-full mb-2 bg-white rounded-xl shadow-xl border border-slate-200 p-3 z-20">
+                          <p className="text-xs text-slate-500 mb-2 font-medium">Pick an emoji</p>
+                          <div className="grid grid-cols-8 gap-1">
                             {commonEmojis.map((emoji) => (
                               <button
                                 key={emoji}
                                 onClick={() => handleEmojiClick(emoji)}
-                                className="w-9 h-9 flex items-center justify-center hover:bg-slate-100 rounded-lg transition-colors text-2xl"
+                                className="w-8 h-8 flex items-center justify-center hover:bg-slate-100 rounded-lg transition-colors text-xl"
                               >
                                 {emoji}
                               </button>
