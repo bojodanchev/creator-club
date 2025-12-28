@@ -1,14 +1,17 @@
 import React, { useState } from 'react';
-import { User, Sparkles, Shield } from 'lucide-react';
+import { User, Sparkles, Shield, Bot } from 'lucide-react';
 import { useAuth } from '../../core/contexts/AuthContext';
+import { useCommunity } from '../../core/contexts/CommunityContext';
 import ProfileSettings from './ProfileSettings';
 import CreatorSettings from './CreatorSettings';
 import AccountSettings from './AccountSettings';
+import { ChatbotSettings } from '../chatbots';
 
-type SettingsTab = 'profile' | 'creator' | 'account';
+type SettingsTab = 'profile' | 'creator' | 'chatbots' | 'account';
 
 const Settings: React.FC = () => {
   const { role } = useAuth();
+  const { selectedCommunity } = useCommunity();
   const [activeTab, setActiveTab] = useState<SettingsTab>('profile');
 
   // Check if user can access creator settings
@@ -28,6 +31,12 @@ const Settings: React.FC = () => {
       visible: canAccessCreatorSettings,
     },
     {
+      id: 'chatbots' as SettingsTab,
+      label: 'Community Chatbots',
+      icon: Bot,
+      visible: canAccessCreatorSettings && !!selectedCommunity,
+    },
+    {
       id: 'account' as SettingsTab,
       label: 'Account',
       icon: Shield,
@@ -41,6 +50,14 @@ const Settings: React.FC = () => {
         return <ProfileSettings />;
       case 'creator':
         return <CreatorSettings />;
+      case 'chatbots':
+        return selectedCommunity ? (
+          <ChatbotSettings communityId={selectedCommunity.id} />
+        ) : (
+          <div className="text-center py-8 text-slate-500">
+            Select a community to configure chatbots
+          </div>
+        );
       case 'account':
         return <AccountSettings />;
       default:
