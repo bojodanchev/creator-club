@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { LayoutDashboard, Users, GraduationCap, Calendar, BrainCircuit, Settings, LogOut, Menu, Plus } from 'lucide-react';
+import { LayoutDashboard, Users, GraduationCap, Calendar, BrainCircuit, Settings, LogOut, Menu, Plus, ClipboardList, Bot, UserCog } from 'lucide-react';
 import { View } from '../core/types';
 import { NAV_ITEMS } from '../core/constants';
 import { useAuth } from '../core/contexts/AuthContext';
@@ -27,6 +27,9 @@ const Sidebar: React.FC<SidebarProps> = ({ currentView, setCurrentView, isOpen, 
     'GraduationCap': <GraduationCap size={20} />,
     'Calendar': <Calendar size={20} />,
     'BrainCircuit': <BrainCircuit size={20} />,
+    'ClipboardList': <ClipboardList size={20} />,
+    'Bot': <Bot size={20} />,
+    'UserCog': <UserCog size={20} />,
   };
 
   // Filter and modify nav items based on role

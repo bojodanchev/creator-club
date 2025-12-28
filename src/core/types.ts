@@ -2,8 +2,11 @@ export enum View {
   DASHBOARD = 'DASHBOARD',
   COMMUNITY = 'COMMUNITY',
   COURSES = 'COURSES',
+  HOMEWORK = 'homework',
+  AI_CHAT = 'ai_chat',
   CALENDAR = 'CALENDAR',
   AI_MANAGER = 'AI_MANAGER',
+  STUDENT_MANAGER = 'student_manager',
   SETTINGS = 'SETTINGS'
 }
 

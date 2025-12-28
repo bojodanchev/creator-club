@@ -156,6 +156,12 @@ export const NAV_ITEMS = [
   { id: View.DASHBOARD, label: 'Dashboard', icon: 'LayoutDashboard' },
   { id: View.COMMUNITY, label: 'Community', icon: 'Users' },
   { id: View.COURSES, label: 'Classroom', icon: 'GraduationCap' },
+  { id: View.HOMEWORK, label: 'Homework', icon: 'ClipboardList' },
+  { id: View.AI_CHAT, label: 'AI Chat', icon: 'Bot' },
   { id: View.CALENDAR, label: 'Calendar', icon: 'Calendar' },
   { id: View.AI_MANAGER, label: 'AI Success Manager', icon: 'BrainCircuit' },
+];
+
+export const CREATOR_NAV_ITEMS = [
+  { id: View.STUDENT_MANAGER, label: 'Student Manager', icon: 'UserCog' },
 ];
