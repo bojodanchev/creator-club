@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { PlayCircle, FileText, CheckCircle, ChevronRight, ChevronDown, Plus, GraduationCap, Loader2, BookOpen, Pencil, BarChart3, ArrowUp, ArrowDown } from 'lucide-react';
 import { useAuth } from '../../core/contexts/AuthContext';
+import { useCommunity } from '../../core/contexts/CommunityContext';
 import {
   getCreatorCourses,
   getEnrolledCourses,
@@ -26,6 +27,7 @@ import CourseAnalyticsPanel from './components/CourseAnalyticsPanel';
 
 const CourseLMS: React.FC = () => {
   const { user, role } = useAuth();
+  const { selectedCommunity } = useCommunity();
 
   // State
   const [courses, setCourses] = useState<CourseWithModules[]>([]);
@@ -122,7 +124,14 @@ const CourseLMS: React.FC = () => {
   const handleCreateCourse = async () => {
     if (!user || !newCourseName.trim()) return;
 
-    const course = await createCourse(user.id, newCourseName.trim(), newCourseDescription.trim() || undefined);
+    // Pass the selected community ID so students in that community can see the course
+    const course = await createCourse(
+      user.id,
+      newCourseName.trim(),
+      newCourseDescription.trim() || undefined,
+      undefined, // thumbnailUrl
+      selectedCommunity?.id // communityId - associates course with the creator's selected community
+    );
     if (course) {
       // Reload courses to get the new one with details
       await loadCourses();
@@ -378,18 +387,29 @@ const CourseLMS: React.FC = () => {
           <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
             <div className="bg-white rounded-xl p-6 w-full max-w-md">
               <h3 className="text-lg font-semibold mb-4">Create Course</h3>
+              {selectedCommunity ? (
+                <p className="text-sm text-slate-500 mb-4">
+                  This course will be added to <span className="font-medium text-slate-700">{selectedCommunity.name}</span>
+                </p>
+              ) : (
+                <p className="text-sm text-amber-600 mb-4">
+                  Please select a community first to create a course.
+                </p>
+              )}
               <input
                 type="text"
                 value={newCourseName}
                 onChange={(e) => setNewCourseName(e.target.value)}
                 placeholder="Course title"
                 className="w-full px-4 py-2 border border-slate-200 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent mb-3"
+                disabled={!selectedCommunity}
               />
               <textarea
                 value={newCourseDescription}
                 onChange={(e) => setNewCourseDescription(e.target.value)}
                 placeholder="Course description (optional)"
                 className="w-full px-4 py-2 border border-slate-200 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent h-24 resize-none"
+                disabled={!selectedCommunity}
               />
               <div className="flex gap-3 mt-4">
                 <button
@@ -400,7 +420,8 @@ const CourseLMS: React.FC = () => {
                 </button>
                 <button
                   onClick={handleCreateCourse}
-                  className="flex-1 bg-indigo-600 text-white px-4 py-2 rounded-lg hover:bg-indigo-700"
+                  disabled={!selectedCommunity}
+                  className="flex-1 bg-indigo-600 text-white px-4 py-2 rounded-lg hover:bg-indigo-700 disabled:opacity-50 disabled:cursor-not-allowed"
                 >
                   Create
                 </button>
@@ -566,6 +587,15 @@ const CourseLMS: React.FC = () => {
           <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
             <div className="bg-white rounded-xl p-6 w-full max-w-md">
               <h3 className="text-lg font-semibold mb-4">Create Course</h3>
+              {selectedCommunity ? (
+                <p className="text-sm text-slate-500 mb-4">
+                  This course will be added to <span className="font-medium text-slate-700">{selectedCommunity.name}</span>
+                </p>
+              ) : (
+                <p className="text-sm text-amber-600 mb-4">
+                  Please select a community first to create a course.
+                </p>
+              )}
               <input
                 type="text"
                 value={newCourseName}
@@ -573,12 +603,14 @@ const CourseLMS: React.FC = () => {
                 placeholder="Course title"
                 className="w-full px-4 py-2 border border-slate-200 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent mb-3"
                 autoFocus
+                disabled={!selectedCommunity}
               />
               <textarea
                 value={newCourseDescription}
                 onChange={(e) => setNewCourseDescription(e.target.value)}
                 placeholder="Course description (optional)"
                 className="w-full px-4 py-2 border border-slate-200 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent h-24 resize-none"
+                disabled={!selectedCommunity}
               />
               <div className="flex gap-3 mt-4">
                 <button
@@ -593,8 +625,8 @@ const CourseLMS: React.FC = () => {
                 </button>
                 <button
                   onClick={handleCreateCourse}
-                  disabled={!newCourseName.trim()}
-                  className="flex-1 bg-indigo-600 text-white px-4 py-2 rounded-lg hover:bg-indigo-700 disabled:opacity-50"
+                  disabled={!newCourseName.trim() || !selectedCommunity}
+                  className="flex-1 bg-indigo-600 text-white px-4 py-2 rounded-lg hover:bg-indigo-700 disabled:opacity-50 disabled:cursor-not-allowed"
                 >
                   Create
                 </button>

@@ -81,11 +81,11 @@ const UserProfilePopup: React.FC<UserProfilePopupProps> = ({
       onClick={onClose}
     >
       <div
-        className="bg-white rounded-xl w-full max-w-sm overflow-hidden shadow-xl"
+        className="bg-white rounded-xl w-full max-w-sm shadow-xl"
         onClick={(e) => e.stopPropagation()}
       >
         {/* Header */}
-        <div className="relative bg-gradient-to-br from-indigo-500 to-purple-600 h-20">
+        <div className="relative bg-gradient-to-br from-indigo-500 to-purple-600 h-20 rounded-t-xl">
           <button
             onClick={onClose}
             className="absolute top-3 right-3 p-1.5 bg-white/20 hover:bg-white/30 rounded-full transition-colors"
