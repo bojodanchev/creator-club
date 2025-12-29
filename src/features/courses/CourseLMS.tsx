@@ -58,10 +58,10 @@ const CourseLMS: React.FC = () => {
   const [editingLesson, setEditingLesson] = useState<DbLesson | null>(null);
   const [lessonForModule, setLessonForModule] = useState<string>('');
 
-  // Load courses on mount
+  // Load courses on mount and when community changes
   useEffect(() => {
     loadCourses();
-  }, [user, role]);
+  }, [user, role, selectedCommunity]);
 
   const loadCourses = async () => {
     if (!user) return;
@@ -71,10 +71,14 @@ const CourseLMS: React.FC = () => {
       let courseList: CourseWithModules[] = [];
 
       if (role === 'creator' || role === 'superadmin') {
-        // Creators see their own courses
+        // Creators see their own courses filtered by selected community
         const creatorCourses = await getCreatorCourses(user.id);
+        // Filter by selected community if one is selected
+        const filteredCourses = selectedCommunity
+          ? creatorCourses.filter(c => c.community_id === selectedCommunity.id)
+          : creatorCourses;
         // Get full details for each course
-        for (const course of creatorCourses) {
+        for (const course of filteredCourses) {
           const details = await getCourseWithDetails(course.id, user.id);
           if (details) courseList.push(details);
         }
@@ -633,6 +637,27 @@ const CourseLMS: React.FC = () => {
               </div>
             </div>
           </div>
+        )}
+
+        {/* Course Edit Modal */}
+        {editingCourse && (
+          <CourseEditModal
+            course={editingCourse}
+            isOpen={!!editingCourse}
+            onClose={() => setEditingCourse(null)}
+            onSave={handleCourseEditSave}
+            onDelete={handleCourseDelete}
+          />
+        )}
+
+        {/* Course Analytics Panel */}
+        {showAnalytics && (
+          <CourseAnalyticsPanel
+            courseId={showAnalytics}
+            courseName={courses.find(c => c.id === showAnalytics)?.title || 'Course'}
+            isOpen={!!showAnalytics}
+            onClose={() => setShowAnalytics(null)}
+          />
         )}
       </div>
     );
