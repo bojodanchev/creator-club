@@ -298,3 +298,408 @@ export interface DbHomeworkAssignmentWithStats extends DbHomeworkAssignment {
   total_submissions: number;
   pending_count: number;
 }
+
+// ============================================================================
+// BILLING SYSTEM TYPES
+// ============================================================================
+
+export type PlanTier = 'starter' | 'pro' | 'scale';
+
+export type BillingStatus =
+  | 'trialing'
+  | 'active'
+  | 'past_due'
+  | 'canceled'
+  | 'incomplete'
+  | 'incomplete_expired'
+  | 'paused';
+
+export type TransactionType =
+  | 'activation_fee'
+  | 'subscription'
+  | 'platform_fee'
+  | 'refund'
+  | 'payout'
+  | 'adjustment';
+
+export type TransactionStatusType = 'pending' | 'completed' | 'failed' | 'refunded';
+
+// Plan Features (stored as JSONB in billing_plans)
+export interface DbPlanFeatures {
+  max_students: number;          // -1 = unlimited
+  max_courses: number;           // -1 = unlimited
+  max_communities: number;       // -1 = unlimited
+  ai_enabled: boolean;
+  custom_branding: boolean;
+  priority_support: boolean;
+  white_label: boolean;
+  advanced_analytics: boolean;
+  api_access: boolean;
+}
+
+// Billing Plans
+export interface DbBillingPlan {
+  id: string;
+  tier: PlanTier;
+  name: string;
+  description: string | null;
+  price_monthly_cents: number;
+  platform_fee_percent: number;
+  stripe_product_id: string | null;
+  stripe_price_id: string | null;
+  features: DbPlanFeatures;
+  is_active: boolean;
+  created_at: string;
+  updated_at: string;
+}
+
+// Creator Billing
+export interface DbCreatorBilling {
+  id: string;
+  creator_id: string;
+  plan_id: string;
+  status: BillingStatus;
+  stripe_customer_id: string | null;
+  stripe_subscription_id: string | null;
+  stripe_account_id: string | null;
+  stripe_account_status: string | null;
+  has_first_sale: boolean;
+  first_sale_at: string | null;
+  monthly_fee_active: boolean;
+  current_period_start: string | null;
+  current_period_end: string | null;
+  trial_end: string | null;
+  cancel_at_period_end: boolean;
+  canceled_at: string | null;
+  activation_fee_paid: boolean;
+  activation_fee_paid_at: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+// Creator Billing with joined plan
+export interface DbCreatorBillingWithPlan extends DbCreatorBilling {
+  plan?: DbBillingPlan;
+}
+
+// Billing Transactions
+export interface DbBillingTransaction {
+  id: string;
+  creator_id: string | null;
+  type: TransactionType;
+  status: TransactionStatusType;
+  amount_cents: number;
+  currency: string;
+  description: string | null;
+  stripe_payment_intent_id: string | null;
+  stripe_invoice_id: string | null;
+  stripe_charge_id: string | null;
+  stripe_transfer_id: string | null;
+  related_sale_id: string | null;
+  related_subscription_id: string | null;
+  metadata: Record<string, unknown>;
+  created_at: string;
+  processed_at: string | null;
+}
+
+// Creator Sales
+export interface DbCreatorSale {
+  id: string;
+  creator_id: string;
+  buyer_id: string | null;
+  product_type: 'course' | 'membership' | 'product';
+  product_id: string | null;
+  product_name: string;
+  sale_amount_cents: number;
+  platform_fee_cents: number;
+  stripe_fee_cents: number;
+  net_amount_cents: number;
+  currency: string;
+  stripe_payment_intent_id: string | null;
+  stripe_charge_id: string | null;
+  stripe_transfer_id: string | null;
+  status: TransactionStatusType;
+  refunded_at: string | null;
+  created_at: string;
+  completed_at: string | null;
+}
+
+// Creator Sale with buyer info
+export interface DbCreatorSaleWithBuyer extends DbCreatorSale {
+  buyer?: DbProfile;
+}
+
+// Webhook Events
+export interface DbWebhookEvent {
+  id: string;
+  stripe_event_id: string;
+  event_type: string;
+  payload: Record<string, unknown>;
+  processed: boolean;
+  processed_at: string | null;
+  error: string | null;
+  created_at: string;
+}
+
+// ============================================================================
+// STUDENT PLUS TYPES (Phase 2: Student Monetization)
+// ============================================================================
+
+export type StudentSubscriptionStatus =
+  | 'trialing'
+  | 'active'
+  | 'past_due'
+  | 'canceled'
+  | 'incomplete'
+  | 'incomplete_expired'
+  | 'paused';
+
+export type RewardType =
+  | 'voucher'
+  | 'template_pack'
+  | 'fee_discount'
+  | 'priority_support'
+  | 'exclusive_content'
+  | 'badge';
+
+export type RedemptionStatus =
+  | 'pending'
+  | 'active'
+  | 'used'
+  | 'expired'
+  | 'revoked';
+
+export type PointTransactionType =
+  | 'subscription_payment'
+  | 'milestone_bonus'
+  | 'referral'
+  | 'engagement'
+  | 'redemption'
+  | 'adjustment'
+  | 'expiration';
+
+// Student Subscriptions
+export interface DbStudentSubscription {
+  id: string;
+  user_id: string;
+  stripe_customer_id: string | null;
+  stripe_subscription_id: string | null;
+  stripe_price_id: string | null;
+  status: StudentSubscriptionStatus;
+  current_period_start: string | null;
+  current_period_end: string | null;
+  trial_start: string | null;
+  trial_end: string | null;
+  cancel_at_period_end: boolean;
+  canceled_at: string | null;
+  cancellation_reason: string | null;
+  subscribed_since: string | null;
+  consecutive_months: number;
+  total_months_subscribed: number;
+  created_at: string;
+  updated_at: string;
+}
+
+// Loyalty Milestones
+export interface DbLoyaltyMilestone {
+  id: string;
+  name: string;
+  description: string | null;
+  months_required: number;
+  bonus_points: number;
+  reward_ids: string[];
+  badge_emoji: string | null;
+  badge_color: string | null;
+  is_active: boolean;
+  created_at: string;
+  updated_at: string;
+}
+
+// Loyalty Points (transaction ledger)
+export interface DbLoyaltyPoint {
+  id: string;
+  user_id: string;
+  subscription_id: string | null;
+  transaction_type: PointTransactionType;
+  points: number;
+  balance_after: number;
+  description: string | null;
+  reference_id: string | null;
+  reference_type: string | null;
+  expires_at: string | null;
+  expired: boolean;
+  metadata: Record<string, unknown>;
+  created_at: string;
+}
+
+// Student Milestone Achievements
+export interface DbStudentMilestoneAchievement {
+  id: string;
+  user_id: string;
+  milestone_id: string;
+  subscription_id: string | null;
+  achieved_at: string;
+  bonus_points_awarded: number;
+  notified: boolean;
+  notified_at: string | null;
+  created_at: string;
+}
+
+export interface DbStudentMilestoneAchievementWithMilestone extends DbStudentMilestoneAchievement {
+  milestone?: DbLoyaltyMilestone;
+}
+
+// Rewards
+export interface DbReward {
+  id: string;
+  name: string;
+  description: string | null;
+  reward_type: RewardType;
+  point_cost: number;
+  is_milestone_reward: boolean;
+  value_config: Record<string, unknown>;
+  is_active: boolean;
+  available_from: string | null;
+  available_until: string | null;
+  max_redemptions: number | null;
+  current_redemptions: number;
+  max_per_user: number | null;
+  cooldown_days: number | null;
+  image_url: string | null;
+  display_order: number;
+  created_at: string;
+  updated_at: string;
+}
+
+// Reward Redemptions
+export interface DbRewardRedemption {
+  id: string;
+  user_id: string;
+  reward_id: string;
+  subscription_id: string | null;
+  milestone_achievement_id: string | null;
+  points_spent: number;
+  status: RedemptionStatus;
+  reward_type: RewardType;
+  reward_value: Record<string, unknown>;
+  valid_from: string | null;
+  valid_until: string | null;
+  used_at: string | null;
+  used_for_reference: string | null;
+  voucher_code: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface DbRewardRedemptionWithReward extends DbRewardRedemption {
+  reward?: DbReward;
+}
+
+// ============================================================================
+// DWY PACKAGES TYPES (Phase 3: Done-With-You Premium Services)
+// ============================================================================
+
+export type DwyPackageTier = 'launch_system' | 'growth_partner';
+
+export type DwyApplicationStatus =
+  | 'pending'
+  | 'under_review'
+  | 'interview_scheduled'
+  | 'approved'
+  | 'rejected'
+  | 'withdrawn'
+  | 'converted';
+
+export type DwyEngagementStatus =
+  | 'onboarding'
+  | 'active'
+  | 'paused'
+  | 'completed'
+  | 'cancelled';
+
+// DWY Package Feature (stored in JSONB)
+export interface DwyPackageFeature {
+  title: string;
+  description: string;
+}
+
+// DWY Packages
+export interface DbDwyPackage {
+  id: string;
+  tier: DwyPackageTier;
+  name: string;
+  tagline: string | null;
+  description: string | null;
+  features: DwyPackageFeature[];
+  price_display: string | null;
+  price_note: string | null;
+  is_active: boolean;
+  slots_available: number | null;
+  display_order: number;
+  highlight_text: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+// DWY Applications
+export interface DbDwyApplication {
+  id: string;
+  creator_id: string;
+  package_id: string;
+  status: DwyApplicationStatus;
+  business_name: string | null;
+  business_type: string | null;
+  current_revenue: string | null;
+  goals: string | null;
+  timeline: string | null;
+  website_url: string | null;
+  social_links: Record<string, string>;
+  how_heard: string | null;
+  additional_notes: string | null;
+  internal_notes: string | null;
+  reviewed_by: string | null;
+  reviewed_at: string | null;
+  interview_scheduled_at: string | null;
+  interview_link: string | null;
+  interview_notes: string | null;
+  decision_reason: string | null;
+  submitted_at: string;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface DbDwyApplicationWithPackage extends DbDwyApplication {
+  package?: DbDwyPackage;
+}
+
+// DWY Engagement Milestone (stored in JSONB)
+export interface DwyEngagementMilestone {
+  name: string;
+  status: 'pending' | 'in_progress' | 'completed';
+  due_at?: string;
+  completed_at?: string;
+}
+
+// DWY Engagements
+export interface DbDwyEngagement {
+  id: string;
+  creator_id: string;
+  package_id: string;
+  application_id: string | null;
+  status: DwyEngagementStatus;
+  started_at: string;
+  expected_end_at: string | null;
+  completed_at: string | null;
+  scope_document_url: string | null;
+  project_folder_url: string | null;
+  slack_channel: string | null;
+  account_manager_id: string | null;
+  milestones: DwyEngagementMilestone[];
+  notes: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface DbDwyEngagementWithPackage extends DbDwyEngagement {
+  package?: DbDwyPackage;
+}
