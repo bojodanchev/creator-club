@@ -81,23 +81,20 @@ const UserProfilePopup: React.FC<UserProfilePopupProps> = ({
       onClick={onClose}
     >
       <div
-        className="bg-white rounded-xl w-full max-w-sm shadow-xl"
+        className="bg-white rounded-xl w-full max-w-sm shadow-xl relative"
         onClick={(e) => e.stopPropagation()}
       >
         {/* Header */}
-        <div className="relative bg-gradient-to-br from-indigo-500 to-purple-600 h-20 rounded-t-xl">
+        <div className="relative bg-gradient-to-br from-indigo-500 to-purple-600 h-24 rounded-t-xl">
           <button
             onClick={onClose}
             className="absolute top-3 right-3 p-1.5 bg-white/20 hover:bg-white/30 rounded-full transition-colors"
           >
             <X size={16} className="text-white" />
           </button>
-        </div>
 
-        {/* Profile Content */}
-        <div className="px-6 pb-6">
-          {/* Avatar */}
-          <div className="flex justify-center -mt-12 mb-4">
+          {/* Avatar - positioned at bottom of header, extending below */}
+          <div className="absolute left-1/2 -translate-x-1/2 bottom-0 translate-y-1/2">
             <div className="w-24 h-24 rounded-full border-4 border-white shadow-lg overflow-hidden bg-slate-100">
               {isLoading ? (
                 <div className="w-full h-full flex items-center justify-center">
@@ -112,6 +109,10 @@ const UserProfilePopup: React.FC<UserProfilePopupProps> = ({
               )}
             </div>
           </div>
+        </div>
+
+        {/* Profile Content */}
+        <div className="px-6 pb-6 pt-14">
 
           {isLoading ? (
             <div className="flex justify-center py-8">
