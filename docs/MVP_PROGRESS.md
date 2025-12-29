@@ -1,6 +1,6 @@
 # Creator Club v1.0 MVP - Progress Tracker
 
-Last Updated: 2025-12-13 (Payment tables added)
+Last Updated: 2025-12-29 (Homework, Chatbots, Student Manager, Course Filtering)
 
 ## Legend
 
@@ -63,6 +63,10 @@ Last Updated: 2025-12-13 (Payment tables added)
 - [X] Like/comment functionality
 - [X] Gamification: Points display
 - [X] Leaderboard
+- [X] **Post pinning** (creators can pin important posts) - NEW 2025-12-28
+- [X] **3-dot menu** on posts (edit, delete, pin options) - NEW 2025-12-28
+- [X] **Emoji picker** for posts (reactions) - NEW 2025-12-28
+- [X] **Image uploads** for posts (Supabase Storage) - NEW 2025-12-28
 
 ---
 
@@ -82,6 +86,12 @@ Last Updated: 2025-12-13 (Payment tables added)
 - [X] Lesson view with video player
 - [X] Progress bar (real data)
 - [X] "Mark as complete" button (functional)
+- [X] **Course Edit Modal** - edit title, description, thumbnail, publish status
+- [X] **Module Edit Modal** - edit module title, description, position
+- [X] **Lesson Edit Modal** - edit lesson title, type, content URL, position
+- [X] **Course Analytics Panel** - enrollment stats, completion rates, student progress
+- [X] **Course-Community filtering** - courses properly scoped to selected community (NEW 2025-12-29)
+- [X] **Edit/Analytics buttons** work immediately from listing view (NEW 2025-12-29)
 - [ ] Drip/Unlock logic
 
 ---
@@ -116,6 +126,69 @@ Last Updated: 2025-12-13 (Payment tables added)
 - [X] Basic KPI cards
 - [X] AI chat interface (fully functional with context injection)
 - [X] Student AI helper in course view (floating chat button)
+
+---
+
+## 4B. Homework & Assignments (NEW 2025-12-28)
+
+### Database
+
+- [X] `homework_assignments` table (community_id, title, description, max_points, due_date, is_published)
+- [X] `homework_submissions` table (assignment_id, student_id, text_response, file_urls, status, points_awarded, feedback)
+- [X] RLS policies for creator/student access
+
+### Backend (Service Layer)
+
+- [X] CRUD for assignments (`homeworkService.ts`)
+- [X] CRUD for submissions
+- [X] File upload support (Supabase Storage)
+- [X] Grading functionality with points (1-10 scale)
+
+### Frontend (Wired to Supabase)
+
+- [X] Student homework page (`HomeworkPage.tsx`) - view assignments, submit work
+- [X] Creator homework management (`HomeworkManagement.tsx`) - create/edit assignments
+- [X] Submission modal with text + file upload (`HomeworkSubmissionModal.tsx`)
+- [X] Grading modal with points slider and feedback (`GradingModal.tsx`)
+- [X] Assignment edit modal (`AssignmentEditModal.tsx`)
+- [X] Sidebar navigation for both roles
+
+---
+
+## 4C. Community Chatbots (NEW 2025-12-28)
+
+### Database
+
+- [X] `community_chatbots` table (name, role: qa/motivation/support, system_prompt, personality, greeting_message)
+- [X] `chatbot_conversations` table (chatbot_id, user_id, messages JSONB)
+- [X] RLS policies for community-scoped access
+
+### Backend (Service Layer)
+
+- [X] CRUD for chatbots (`chatbotService.ts`)
+- [X] Conversation management (create, get, update messages)
+- [X] AI integration with Gemini (context-aware responses)
+- [X] Role-based presets (Q&A Expert, Motivator, Support)
+
+### Frontend (Wired to Supabase)
+
+- [X] Chatbots page with tabbed navigation (`ChatbotsPage.tsx`)
+- [X] Chatbot edit modal with role presets (`ChatbotEditModal.tsx`)
+- [X] Chatbot conversation UI (`ChatbotConversation.tsx`)
+- [X] Chatbot settings integration in Settings page (`ChatbotSettings.tsx`)
+- [X] Sidebar navigation for students (AI Chat)
+
+---
+
+## 4D. Student Manager (NEW 2025-12-28)
+
+### Frontend (Wired to Supabase)
+
+- [X] Student Manager page (`StudentManagerPage.tsx`)
+- [X] Student list with search/filter
+- [X] Bonus points awarding functionality
+- [X] Points transaction history
+- [X] Sidebar navigation for creators
 
 ---
 
@@ -222,13 +295,16 @@ Last Updated: 2025-12-13 (Payment tables added)
 | Category                     | Status             | Notes                                               |
 | ---------------------------- | ------------------ | --------------------------------------------------- |
 | **Auth & Users**       | **COMPLETE** | Supabase Auth working, roles, profiles              |
-| **Database Schema**    | **100%**     | 23 tables created with RLS policies                 |
-| **Community Hub**      | **100%**     | Fully wired to Supabase with gamification           |
-| **Course LMS**         | **85%**      | Fully wired to Supabase                             |
+| **Database Schema**    | **100%**     | 28 tables created with RLS policies                 |
+| **Community Hub**      | **100%**     | Fully wired + post pinning, images, emoji picker    |
+| **Course LMS**         | **95%**      | Full CRUD, analytics, community filtering (only drip missing) |
 | **AI Success Manager** | **100%**     | Fully implemented with Postgres trigger + Gemini AI |
+| **Homework System**    | **100%**     | Full assignment/submission/grading workflow (NEW)   |
+| **Community Chatbots** | **100%**     | Multiple AI chatbots per community (NEW)            |
+| **Student Manager**    | **100%**     | Student list, bonus points, search/filter (NEW)     |
 | **Calendar & Events**  | **90%**      | Fully wired to Supabase with ICS export             |
 | **Payments (Stripe)**  | **30%**      | Database ready, Stripe integration pending          |
-| **Admin Dashboard**    | **80%**      | Wired to real data                                  |
+| **Admin Dashboard**    | **85%**      | Wired to real data + student manager                |
 | **Tasks**              | **100%**     | Fully implemented with UI                           |
 | **Landing Page**       | **60%**      | Main landing + community landing pages complete     |
 | **Analytics**          | 0%                 | Not started                                         |
@@ -296,6 +372,46 @@ Last Updated: 2025-12-13 (Payment tables added)
   - `PlanType`, `SubscriptionStatus`, `PlanFeatures`
 - RLS policies for all new tables
 
+### Phase 5: EFI Features - Homework, Chatbots, Student Manager (COMPLETE - 2025-12-28)
+
+- Migration 011: `efi_features`
+  - `community_chatbots` table with role presets (qa, motivation, support)
+  - `chatbot_conversations` table for AI chat history
+  - `homework_assignments` table for creator assignments
+  - `homework_submissions` table with grading workflow
+- **Homework System** - Full workflow:
+  - Creator creates/edits assignments with due dates and max points
+  - Students view assignments and submit text/file responses
+  - Creator grades submissions with points (1-10) and feedback
+  - Sidebar navigation for both roles
+- **Community Chatbots** - Multiple AI personas:
+  - Q&A Expert, Motivator, Support chatbot roles
+  - Custom system prompts and personalities
+  - Persistent conversation history per user
+  - Integrated in Settings page
+- **Student Manager** - Creator tools:
+  - Student list with search and filter
+  - Bonus points awarding with transaction history
+  - Direct access from sidebar
+
+### Phase 5B: Community Post Enhancements (COMPLETE - 2025-12-28)
+
+- Migration 012: `add_is_pinned_to_posts`
+- Migration 013: `add_image_url_to_posts`
+- **Post Pinning** - Creators can pin important announcements
+- **3-Dot Menu** - Edit, delete, pin options on posts
+- **Emoji Picker** - React to posts with emojis
+- **Image Uploads** - Attach images to posts via Supabase Storage
+
+### Phase 5C: Course-Community Integration Fix (COMPLETE - 2025-12-29)
+
+- **Course-Community Filtering** - Courses now properly filtered by selected community
+- **Edit/Analytics Buttons** - Work immediately from course listing (no need to click into course first)
+- Fixed `CourseLMS.tsx`:
+  - Added `selectedCommunity` to useEffect dependencies
+  - Filter courses by `community_id` matching selected community
+  - Render modals in listing view, not just player view
+
 ---
 
 ## Next Steps (Priority Order)
@@ -307,4 +423,6 @@ Last Updated: 2025-12-13 (Payment tables added)
    - Webhook handlers
    - Trial logic (14 days)
 2. ~~**Phase 4: AI Integration** - Connect AI Success Manager to real data~~ ✅ COMPLETE
-3. **Phase 5: Deploy to Vercel**
+3. ~~**Phase 5: EFI Features** - Homework, Chatbots, Student Manager~~ ✅ COMPLETE
+4. **Phase 6: Drip/Unlock Logic** - Course content scheduling
+5. **Phase 7: Analytics & Tracking** - Event tracking, Google Analytics
