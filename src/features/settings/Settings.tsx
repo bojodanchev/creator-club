@@ -1,13 +1,14 @@
 import React, { useState } from 'react';
-import { User, Sparkles, Shield, Bot } from 'lucide-react';
+import { User, Sparkles, Shield, Bot, CreditCard } from 'lucide-react';
 import { useAuth } from '../../core/contexts/AuthContext';
 import { useCommunity } from '../../core/contexts/CommunityContext';
 import ProfileSettings from './ProfileSettings';
 import CreatorSettings from './CreatorSettings';
 import AccountSettings from './AccountSettings';
 import { ChatbotSettings } from '../chatbots';
+import { BillingSettingsPage } from '../billing';
 
-type SettingsTab = 'profile' | 'creator' | 'chatbots' | 'account';
+type SettingsTab = 'profile' | 'creator' | 'billing' | 'chatbots' | 'account';
 
 const Settings: React.FC = () => {
   const { role } = useAuth();
@@ -31,6 +32,12 @@ const Settings: React.FC = () => {
       visible: canAccessCreatorSettings,
     },
     {
+      id: 'billing' as SettingsTab,
+      label: 'Billing',
+      icon: CreditCard,
+      visible: canAccessCreatorSettings,
+    },
+    {
       id: 'chatbots' as SettingsTab,
       label: 'Community Chatbots',
       icon: Bot,
@@ -50,6 +57,8 @@ const Settings: React.FC = () => {
         return <ProfileSettings />;
       case 'creator':
         return <CreatorSettings />;
+      case 'billing':
+        return <BillingSettingsPage />;
       case 'chatbots':
         return selectedCommunity ? (
           <ChatbotSettings communityId={selectedCommunity.id} />

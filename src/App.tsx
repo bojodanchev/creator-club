@@ -10,6 +10,7 @@ import { LoginPage, SignupPage } from './features/auth';
 import { CommunityLandingPage } from './public-pages/communities/CommunityLandingPage';
 import { CommunitiesDirectory } from './public-pages/communities/CommunitiesDirectory';
 import { LandingPage as CourseCatalogPage } from './features/landing';
+import { PricingPage } from './features/billing';
 
 // Protected components
 import ProtectedRoute from './public-pages/auth/ProtectedRoute';
@@ -286,6 +287,7 @@ const AppRoutes: React.FC = () => {
       <Route path="/signup" element={<SignupPage />} />
       <Route path="/communities" element={<CommunitiesDirectory />} />
       <Route path="/community/:communityId" element={<CommunityLandingPage />} />
+      <Route path="/pricing" element={<PricingPage />} />
 
       {/* Protected routes - Main app layout */}
       <Route
