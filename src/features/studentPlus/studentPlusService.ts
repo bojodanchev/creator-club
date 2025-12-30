@@ -3,7 +3,7 @@
 // Phase 2: Student Monetization with Loyalty Points & Rewards
 // =============================================================================
 
-import { supabase } from '@/core/supabase/client';
+import { supabase } from '../../core/supabase/client';
 import type {
   StudentSubscription,
   LoyaltyPointsBalance,

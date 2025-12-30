@@ -10,7 +10,9 @@ import { LoginPage, SignupPage } from './features/auth';
 import { CommunityLandingPage } from './public-pages/communities/CommunityLandingPage';
 import { CommunitiesDirectory } from './public-pages/communities/CommunitiesDirectory';
 import { LandingPage as CourseCatalogPage } from './features/landing';
-import { PricingPage } from './features/billing';
+import { PricingPage, OnboardingPage } from './features/billing';
+import { StudentPlusPage, RewardsPage } from './features/studentPlus';
+import { DwyPackagesPage } from './features/dwyPackages';
 
 // Protected components
 import ProtectedRoute from './public-pages/auth/ProtectedRoute';
@@ -289,6 +291,16 @@ const AppRoutes: React.FC = () => {
       <Route path="/community/:communityId" element={<CommunityLandingPage />} />
       <Route path="/pricing" element={<PricingPage />} />
 
+      {/* Creator onboarding (activation fee) */}
+      <Route
+        path="/onboarding"
+        element={
+          <ProtectedRouteWrapper allowedRoles={['creator', 'superadmin']}>
+            <OnboardingPage />
+          </ProtectedRouteWrapper>
+        }
+      />
+
       {/* Protected routes - Main app layout */}
       <Route
         path="/app/*"
@@ -359,6 +371,34 @@ const AppRoutes: React.FC = () => {
             <CommunityProvider>
               <AppLayout />
             </CommunityProvider>
+          </ProtectedRouteWrapper>
+        }
+      />
+
+      {/* Student Plus routes - for students */}
+      <Route
+        path="/student-plus"
+        element={
+          <ProtectedRouteWrapper>
+            <StudentPlusPage />
+          </ProtectedRouteWrapper>
+        }
+      />
+      <Route
+        path="/student-plus/rewards"
+        element={
+          <ProtectedRouteWrapper>
+            <RewardsPage />
+          </ProtectedRouteWrapper>
+        }
+      />
+
+      {/* DWY Packages route - for potential clients */}
+      <Route
+        path="/dwy-packages"
+        element={
+          <ProtectedRouteWrapper>
+            <DwyPackagesPage />
           </ProtectedRouteWrapper>
         }
       />

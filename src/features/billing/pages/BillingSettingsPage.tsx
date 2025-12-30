@@ -17,6 +17,9 @@ import {
   ExternalLink,
   AlertTriangle,
   XCircle,
+  Wallet,
+  ArrowRight,
+  RefreshCw,
 } from 'lucide-react';
 import { useAuth } from '../../../core/contexts/AuthContext';
 import UpgradeModal from '../components/UpgradeModal';
@@ -25,6 +28,7 @@ import type {
   BillingDashboardData,
   BillingTransaction,
   PlanTier,
+  ConnectAccountStatus,
 } from '../stripeTypes';
 import {
   getBillingDashboard,
@@ -36,6 +40,10 @@ import {
   resumeSubscription,
   formatAmount,
   getTransactions,
+  createConnectAccount,
+  getConnectOnboardingLink,
+  getConnectAccountStatus,
+  createPlanSubscription,
 } from '../stripeService';
 
 const BillingSettingsPage: React.FC = () => {
@@ -46,6 +54,7 @@ const BillingSettingsPage: React.FC = () => {
   const [dashboard, setDashboard] = useState<BillingDashboardData | null>(null);
   const [plans, setPlans] = useState<BillingPlan[]>([]);
   const [transactions, setTransactions] = useState<BillingTransaction[]>([]);
+  const [connectStatus, setConnectStatus] = useState<ConnectAccountStatus | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -54,6 +63,7 @@ const BillingSettingsPage: React.FC = () => {
   const [selectedPlan, setSelectedPlan] = useState<BillingPlan | null>(null);
   const [showCancelModal, setShowCancelModal] = useState(false);
   const [isProcessing, setIsProcessing] = useState(false);
+  const [isConnectLoading, setIsConnectLoading] = useState(false);
 
   // Load billing data
   useEffect(() => {
@@ -64,15 +74,17 @@ const BillingSettingsPage: React.FC = () => {
       setError(null);
 
       try {
-        const [dashboardData, plansData, transactionsData] = await Promise.all([
+        const [dashboardData, plansData, transactionsData, connectData] = await Promise.all([
           getBillingDashboard(profile.id),
           getPlans(),
           getTransactions(profile.id, { limit: 20 }),
+          getConnectAccountStatus(profile.id),
         ]);
 
         setDashboard(dashboardData);
         setPlans(plansData);
         setTransactions(transactionsData);
+        setConnectStatus(connectData);
       } catch (err) {
         console.error('Error loading billing data:', err);
         setError('Failed to load billing information');
@@ -121,6 +133,20 @@ const BillingSettingsPage: React.FC = () => {
       const result = await changePlan(profile.id, selectedPlan.tier);
 
       if (result.success) {
+        // Check if subscription checkout is required (has first sale but no active subscription yet)
+        if (result.requiresCheckout) {
+          // Create subscription checkout session and redirect
+          const checkoutResult = await createPlanSubscription(profile.id, selectedPlan.tier);
+          if (checkoutResult.success && checkoutResult.checkoutUrl) {
+            window.location.href = checkoutResult.checkoutUrl;
+            return;
+          } else {
+            setError(checkoutResult.error || 'Failed to create checkout session');
+            setIsProcessing(false);
+            return;
+          }
+        }
+
         // Refresh dashboard
         const dashboardData = await getBillingDashboard(profile.id);
         setDashboard(dashboardData);
@@ -178,6 +204,53 @@ const BillingSettingsPage: React.FC = () => {
       setError('An error occurred while resuming your subscription');
     } finally {
       setIsProcessing(false);
+    }
+  };
+
+  // Handle setting up Stripe Connect for payouts
+  const handleSetupPayouts = async () => {
+    if (!profile?.id || !profile?.email) return;
+
+    setIsConnectLoading(true);
+    setError(null);
+
+    try {
+      // First, create the Connect account if it doesn't exist
+      if (!connectStatus) {
+        const createResult = await createConnectAccount(profile.id, profile.email);
+        if (!createResult.success) {
+          setError(createResult.error || 'Failed to create payout account');
+          return;
+        }
+      }
+
+      // Get the onboarding link
+      const onboardingUrl = await getConnectOnboardingLink(profile.id);
+      if (onboardingUrl) {
+        window.location.href = onboardingUrl;
+      } else {
+        setError('Failed to get onboarding link');
+      }
+    } catch (err) {
+      console.error('Error setting up payouts:', err);
+      setError('An error occurred while setting up payouts');
+    } finally {
+      setIsConnectLoading(false);
+    }
+  };
+
+  // Handle refreshing Connect account status
+  const handleRefreshConnectStatus = async () => {
+    if (!profile?.id) return;
+
+    setIsConnectLoading(true);
+    try {
+      const status = await getConnectAccountStatus(profile.id);
+      setConnectStatus(status);
+    } catch (err) {
+      console.error('Error refreshing connect status:', err);
+    } finally {
+      setIsConnectLoading(false);
     }
   };
 
@@ -363,6 +436,144 @@ const BillingSettingsPage: React.FC = () => {
         </div>
       </div>
 
+      {/* Payouts Section (Stripe Connect) */}
+      <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-6">
+        <div className="flex items-start justify-between mb-6">
+          <div>
+            <h2 className="text-lg font-semibold text-slate-900">Payouts</h2>
+            <p className="text-slate-500 text-sm">
+              Receive your earnings directly to your bank account
+            </p>
+          </div>
+          {connectStatus && (
+            <button
+              onClick={handleRefreshConnectStatus}
+              disabled={isConnectLoading}
+              className="p-2 text-slate-400 hover:text-slate-600 hover:bg-slate-100 rounded-lg transition-colors disabled:opacity-50"
+              title="Refresh status"
+            >
+              <RefreshCw size={16} className={isConnectLoading ? 'animate-spin' : ''} />
+            </button>
+          )}
+        </div>
+
+        {!connectStatus ? (
+          // No Connect account - show setup prompt
+          <div className="p-6 bg-gradient-to-r from-indigo-50 to-purple-50 rounded-lg border border-indigo-100">
+            <div className="flex items-start gap-4">
+              <div className="w-12 h-12 bg-indigo-100 rounded-lg flex items-center justify-center shrink-0">
+                <Wallet size={24} className="text-indigo-600" />
+              </div>
+              <div className="flex-1">
+                <h3 className="font-semibold text-slate-900 mb-1">Set Up Payouts</h3>
+                <p className="text-sm text-slate-600 mb-4">
+                  Connect your bank account to receive payouts when students purchase your courses and memberships.
+                </p>
+                <button
+                  onClick={handleSetupPayouts}
+                  disabled={isConnectLoading}
+                  className="bg-indigo-600 text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-indigo-700 transition-colors flex items-center gap-2 disabled:opacity-50"
+                >
+                  {isConnectLoading ? (
+                    <>
+                      <Loader2 size={16} className="animate-spin" />
+                      Setting up...
+                    </>
+                  ) : (
+                    <>
+                      Set Up Payouts
+                      <ArrowRight size={16} />
+                    </>
+                  )}
+                </button>
+              </div>
+            </div>
+          </div>
+        ) : (
+          // Has Connect account - show status
+          <div className="space-y-4">
+            <div className="flex items-center gap-4 p-4 bg-slate-50 rounded-lg">
+              <div className="w-12 h-12 bg-indigo-100 rounded-lg flex items-center justify-center">
+                <Wallet size={24} className="text-indigo-600" />
+              </div>
+              <div className="flex-1">
+                <div className="flex items-center gap-2">
+                  <h3 className="font-semibold text-slate-900">Payout Account</h3>
+                  <ConnectStatusBadge status={connectStatus.status} />
+                </div>
+                <p className="text-sm text-slate-600">
+                  {connectStatus.status === 'active'
+                    ? 'Your payout account is active and ready to receive funds'
+                    : connectStatus.status === 'pending'
+                    ? 'Complete onboarding to start receiving payouts'
+                    : 'There are issues with your payout account that need attention'}
+                </p>
+              </div>
+              {connectStatus.status !== 'active' && (
+                <button
+                  onClick={handleSetupPayouts}
+                  disabled={isConnectLoading}
+                  className="bg-indigo-600 text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-indigo-700 transition-colors disabled:opacity-50"
+                >
+                  {isConnectLoading ? 'Loading...' : 'Complete Setup'}
+                </button>
+              )}
+            </div>
+
+            {/* Status details */}
+            <div className="grid md:grid-cols-3 gap-4">
+              <div className="p-4 border border-slate-200 rounded-lg">
+                <div className="flex items-center gap-2 mb-2">
+                  {connectStatus.chargesEnabled ? (
+                    <CheckCircle size={18} className="text-green-500" />
+                  ) : (
+                    <Clock size={18} className="text-amber-500" />
+                  )}
+                  <span className="font-medium text-slate-900">Accept Payments</span>
+                </div>
+                <p className="text-sm text-slate-600">
+                  {connectStatus.chargesEnabled
+                    ? 'You can accept payments from students'
+                    : 'Complete verification to accept payments'}
+                </p>
+              </div>
+
+              <div className="p-4 border border-slate-200 rounded-lg">
+                <div className="flex items-center gap-2 mb-2">
+                  {connectStatus.payoutsEnabled ? (
+                    <CheckCircle size={18} className="text-green-500" />
+                  ) : (
+                    <Clock size={18} className="text-amber-500" />
+                  )}
+                  <span className="font-medium text-slate-900">Receive Payouts</span>
+                </div>
+                <p className="text-sm text-slate-600">
+                  {connectStatus.payoutsEnabled
+                    ? 'Payouts are automatically sent to your bank'
+                    : 'Add bank details to receive payouts'}
+                </p>
+              </div>
+
+              <div className="p-4 border border-slate-200 rounded-lg">
+                <div className="flex items-center gap-2 mb-2">
+                  {connectStatus.detailsSubmitted ? (
+                    <CheckCircle size={18} className="text-green-500" />
+                  ) : (
+                    <Clock size={18} className="text-amber-500" />
+                  )}
+                  <span className="font-medium text-slate-900">Identity Verified</span>
+                </div>
+                <p className="text-sm text-slate-600">
+                  {connectStatus.detailsSubmitted
+                    ? 'Your identity has been verified'
+                    : 'Provide identity documents for verification'}
+                </p>
+              </div>
+            </div>
+          </div>
+        )}
+      </div>
+
       {/* Revenue Overview */}
       <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-6">
         <h2 className="text-lg font-semibold text-slate-900 mb-6">Revenue Overview</h2>
@@ -482,6 +693,27 @@ const StatusBadge: React.FC<StatusBadgeProps> = ({ status }) => {
   };
 
   const { bg, text, label } = config[status] || config.incomplete;
+
+  return (
+    <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${bg} ${text}`}>
+      {label}
+    </span>
+  );
+};
+
+interface ConnectStatusBadgeProps {
+  status: string;
+}
+
+const ConnectStatusBadge: React.FC<ConnectStatusBadgeProps> = ({ status }) => {
+  const config: Record<string, { bg: string; text: string; label: string }> = {
+    active: { bg: 'bg-green-100', text: 'text-green-700', label: 'Active' },
+    pending: { bg: 'bg-amber-100', text: 'text-amber-700', label: 'Pending' },
+    restricted: { bg: 'bg-red-100', text: 'text-red-700', label: 'Action Required' },
+    disabled: { bg: 'bg-slate-100', text: 'text-slate-700', label: 'Disabled' },
+  };
+
+  const { bg, text, label } = config[status] || config.pending;
 
   return (
     <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${bg} ${text}`}>

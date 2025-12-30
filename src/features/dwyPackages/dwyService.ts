@@ -3,7 +3,7 @@
 // Phase 3: Done-With-You Premium Services
 // =============================================================================
 
-import { supabase } from '@/core/supabase/client';
+import { supabase } from '../../core/supabase/client';
 import type {
   DwyPackage,
   DwyApplication,

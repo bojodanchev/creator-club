@@ -1,6 +1,6 @@
 # Creator Club v1.0 MVP - Progress Tracker
 
-Last Updated: 2025-12-29 (Homework, Chatbots, Student Manager, Course Filtering)
+Last Updated: 2025-12-30 (Stripe Infrastructure Fully Deployed - Edge Functions, Webhook, Secrets)
 
 ## Legend
 
@@ -43,6 +43,8 @@ Last Updated: 2025-12-29 (Homework, Chatbots, Student Manager, Course Filtering)
 - [X] Engagement table (points, point_transactions, post_likes)
 - [X] Task table
 - [X] Student Health table (for AI Success Manager)
+- [X] **Billing tables** (billing_plans, creator_billing, creator_sales, billing_transactions, webhook_events) - NEW 2025-12-29
+- [X] **Student Plus tables** (student_plus_subscriptions, dwy_packages, dwy_purchases) - NEW 2025-12-29
 
 ---
 
@@ -212,26 +214,61 @@ Last Updated: 2025-12-29 (Homework, Chatbots, Student Manager, Course Filtering)
 
 ## 6. Payments & Plans
 
-### Database (COMPLETE - 2025-12-13)
+### Database (COMPLETE - 2025-12-29)
 
 - [X] `payment_plans` table with Creator/Business/Elite tiers
 - [X] `subscriptions` table with Stripe integration fields
 - [X] Plan features stored as JSONB (max_students, ai_enabled, etc.)
 - [X] RLS policies for subscription access
 - [X] TypeScript types in `types.ts`
+- [X] **Creator Billing System** (NEW 2025-12-29)
+  - [X] `billing_plans` table (Starter/Pro/Scale tiers with platform fees)
+  - [X] `creator_billing` table (subscription status, Stripe customer/account IDs)
+  - [X] `creator_sales` table (track creator product sales)
+  - [X] `billing_transactions` table (activation fees, subscriptions, payouts)
+  - [X] `webhook_events` table (idempotent webhook processing)
+- [X] **Student Plus System** (NEW 2025-12-29)
+  - [X] `student_plus_subscriptions` table
+  - [X] `dwy_packages` and `dwy_purchases` tables
 
-### Backend
+### Backend (Edge Functions) - DEPLOYED 2025-12-30
 
-- [ ] Stripe integration
-- [ ] Checkout session endpoints
-- [ ] Webhooks (success, cancel)
-- [ ] Trial logic
+- [X] Stripe integration (via Supabase Edge Functions)
+- [X] `stripe-checkout` - Activation fees, subscription checkouts, payment intents
+- [X] `stripe-subscription` - Plan changes, cancel/resume, billing portal
+- [X] `stripe-webhook` - All Stripe event handling (checkout, invoices, subscriptions, payouts)
+- [X] `stripe-connect` - Connect account creation, onboarding, dashboard links
+- [X] `student-plus-checkout` - Student subscription checkout
+- [X] `student-plus-portal` - Student billing portal
 
-### Frontend
+### Infrastructure (DEPLOYED 2025-12-30)
 
-- [ ] Pricing page/modal
-- [ ] Billing section
-- [ ] Plan upgrade/downgrade
+- [X] All 7 Edge Functions deployed to Supabase (ACTIVE status)
+- [X] Stripe Webhook Endpoint configured (LIVE mode)
+  - URL: `https://znqesarsluytxhuiwfkt.supabase.co/functions/v1/stripe-webhook`
+  - Events: checkout.session.completed, invoice.paid/failed, customer.subscription.*, payment_intent.*, account.updated, payout.*
+- [X] Supabase Secrets configured
+  - `STRIPE_SECRET_KEY` (live key)
+  - `STRIPE_WEBHOOK_SECRET` (whsec_...)
+- [ ] Trial logic (14 days) - Future enhancement
+
+### Stripe Products (COMPLETE - 2025-12-29)
+
+- [X] Activation Fee: €2.90 one-time (prod_ThBhGe4gwluiQ8)
+- [X] Pro Plan: €30/month, 3.9% platform fee (prod_ThBhoMU9mCS03d)
+- [X] Scale Plan: €99/month, 1.9% platform fee (prod_ThBhNjnTJAQEFi)
+- [X] Starter Plan: Free, 6.9% platform fee (no Stripe product needed)
+
+### Frontend (COMPLETE - 2025-12-29)
+
+- [X] **Creator Onboarding** (`OnboardingPage.tsx`) - Activation fee payment
+- [X] **Billing Settings** (`BillingSettingsPage.tsx`) - Plan management, usage stats
+- [X] **Stripe Connect UI** - Payout setup, account status, dashboard links
+- [X] **Course Purchase** (`CoursePurchaseModal.tsx`) - Stripe Elements payment
+- [X] **Enroll Button** (`CourseEnrollButton.tsx`) - Free vs paid course detection
+- [X] **Student Plus** (`StudentPlusPage.tsx`) - Subscription checkout with success handling
+- [X] **Stripe Service** (`stripeService.ts`) - Frontend API for all Stripe operations
+- [X] **Stripe Types** (`stripeTypes.ts`) - Full TypeScript type definitions
 
 ---
 
@@ -295,7 +332,7 @@ Last Updated: 2025-12-29 (Homework, Chatbots, Student Manager, Course Filtering)
 | Category                     | Status             | Notes                                               |
 | ---------------------------- | ------------------ | --------------------------------------------------- |
 | **Auth & Users**       | **COMPLETE** | Supabase Auth working, roles, profiles              |
-| **Database Schema**    | **100%**     | 28 tables created with RLS policies                 |
+| **Database Schema**    | **100%**     | 35+ tables with RLS policies (includes billing)     |
 | **Community Hub**      | **100%**     | Fully wired + post pinning, images, emoji picker    |
 | **Course LMS**         | **95%**      | Full CRUD, analytics, community filtering (only drip missing) |
 | **AI Success Manager** | **100%**     | Fully implemented with Postgres trigger + Gemini AI |
@@ -303,7 +340,7 @@ Last Updated: 2025-12-29 (Homework, Chatbots, Student Manager, Course Filtering)
 | **Community Chatbots** | **100%**     | Multiple AI chatbots per community (NEW)            |
 | **Student Manager**    | **100%**     | Student list, bonus points, search/filter (NEW)     |
 | **Calendar & Events**  | **90%**      | Fully wired to Supabase with ICS export             |
-| **Payments (Stripe)**  | **30%**      | Database ready, Stripe integration pending          |
+| **Payments (Stripe)**  | **100%**     | Full Stripe integration deployed (trial logic = future enhancement) |
 | **Admin Dashboard**    | **85%**      | Wired to real data + student manager                |
 | **Tasks**              | **100%**     | Fully implemented with UI                           |
 | **Landing Page**       | **60%**      | Main landing + community landing pages complete     |
@@ -412,17 +449,62 @@ Last Updated: 2025-12-29 (Homework, Chatbots, Student Manager, Course Filtering)
   - Filter courses by `community_id` matching selected community
   - Render modals in listing view, not just player view
 
+### Phase 3: Stripe Integration (COMPLETE - 2025-12-30)
+
+**Database Schema:**
+- Migration 011: `billing_system` - Creator billing tables
+- Migration 012: `billing_security` - RLS policies for billing
+- Tables: `billing_plans`, `creator_billing`, `creator_sales`, `billing_transactions`, `webhook_events`
+- Student Plus tables: `student_plus_subscriptions`, `dwy_packages`, `dwy_purchases`
+
+**Stripe Products Created:**
+- Activation Fee: €2.90 one-time (prod_ThBhGe4gwluiQ8 / price_1SjnKmFbO001Rr4nTKadFx23)
+- Pro Plan: €30/month (prod_ThBhoMU9mCS03d / price_1SjnKnFbO001Rr4nE31ve9YU)
+- Scale Plan: €99/month (prod_ThBhNjnTJAQEFi / price_1SjnKnFbO001Rr4nrgpXSf0h)
+
+**Edge Functions Deployed (7 total, all ACTIVE):**
+- `stripe-checkout` - Activation, subscriptions, payment intents
+- `stripe-subscription` - Plan changes, cancel/resume, billing portal
+- `stripe-webhook` - All event handling (checkout, invoices, subscriptions, Connect, payouts)
+- `stripe-connect` - Express account creation, onboarding, dashboard links
+- `student-plus-checkout` - Student subscription checkout
+- `student-plus-portal` - Student billing portal
+- `ai-chat` - AI conversation handling
+
+**Live Infrastructure Deployed (2025-12-30):**
+- Stripe Webhook Endpoint: `https://znqesarsluytxhuiwfkt.supabase.co/functions/v1/stripe-webhook`
+- Webhook ID: `we_1Sk4MdFbO001Rr4nPMqOLW9x` (LIVE mode)
+- Events: checkout.session.completed, invoice.paid, invoice.payment_failed, customer.subscription.*, payment_intent.*, account.updated, payout.*
+- Supabase Secrets: `STRIPE_SECRET_KEY`, `STRIPE_WEBHOOK_SECRET`
+
+**Frontend Components:**
+- `OnboardingPage.tsx` - Creator activation fee payment flow
+- `BillingSettingsPage.tsx` - Plan management, Connect status, usage stats
+- `CoursePurchaseModal.tsx` - Stripe Elements payment for course purchases
+- `CourseEnrollButton.tsx` - Smart free/paid course detection
+- `StudentPlusPage.tsx` - Student subscription with checkout success handling
+- `CreatorSettings.tsx` - Connect payout status integration
+
+**Services:**
+- `stripeService.ts` - Frontend API (activation, subscriptions, Connect, sales)
+- `stripeTypes.ts` - Full TypeScript types (494 lines)
+
+**Platform Fee Structure (from Pricing Model):**
+- Starter: Free, 6.9% platform fee
+- Pro: €30/month, 3.9% platform fee (monthly fee starts after first sale)
+- Scale: €99/month, 1.9% platform fee (monthly fee starts after first sale)
+
+**Break-even Points:**
+- Starter → Pro: ~€750/month revenue
+- Pro → Scale: ~€6,900/month revenue
+
 ---
 
 ## Next Steps (Priority Order)
 
-1. **Phase 3: Stripe Integration** - Payments & subscriptions
-   - ~~Database schema~~ ✅ COMPLETE
-   - Stripe SDK setup
-   - Checkout sessions
-   - Webhook handlers
-   - Trial logic (14 days)
+1. ~~**Phase 3: Stripe Integration** - Payments & subscriptions~~ ✅ COMPLETE
 2. ~~**Phase 4: AI Integration** - Connect AI Success Manager to real data~~ ✅ COMPLETE
 3. ~~**Phase 5: EFI Features** - Homework, Chatbots, Student Manager~~ ✅ COMPLETE
 4. **Phase 6: Drip/Unlock Logic** - Course content scheduling
 5. **Phase 7: Analytics & Tracking** - Event tracking, Google Analytics
+6. **Phase 8: Trial Logic** - 14-day free trial for creator plans

@@ -150,3 +150,6 @@ export { default as PricingPage } from './pages/PricingPage';
 
 // Billing settings page (for Settings tab)
 export { default as BillingSettingsPage } from './pages/BillingSettingsPage';
+
+// Creator onboarding page (activation fee)
+export { default as OnboardingPage } from './pages/OnboardingPage';

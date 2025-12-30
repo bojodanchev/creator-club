@@ -613,6 +613,62 @@ export async function updateLessonProgress(
 }
 
 // ============================================================================
+// COURSE PURCHASE & ENROLLMENT
+// ============================================================================
+
+/**
+ * Complete enrollment after successful payment
+ * This is called when a paid course purchase succeeds
+ */
+export async function completeCoursePurchase(
+  userId: string,
+  courseId: string,
+  paymentIntentId: string
+): Promise<DbEnrollment | null> {
+  // First check if already enrolled
+  const existing = await getEnrollment(userId, courseId);
+  if (existing) {
+    console.log('User already enrolled in course');
+    return existing;
+  }
+
+  // Create enrollment with payment reference in metadata
+  const { data, error } = await supabase
+    .from('enrollments')
+    .insert({
+      user_id: userId,
+      course_id: courseId,
+      status: 'active',
+    })
+    .select()
+    .single();
+
+  if (error) {
+    console.error('Error completing course purchase:', error);
+    return null;
+  }
+
+  return data;
+}
+
+/**
+ * Check if a course requires payment
+ * For now, we check if the course has a price_cents field > 0
+ * This will be expanded when the database schema includes course pricing
+ */
+export function courseRequiresPayment(course: DbCourse & { price_cents?: number }): boolean {
+  return (course.price_cents ?? 0) > 0;
+}
+
+/**
+ * Get course price in cents (for payment intent)
+ * Returns 0 for free courses
+ */
+export function getCoursePrice(course: DbCourse & { price_cents?: number }): number {
+  return course.price_cents ?? 0;
+}
+
+// ============================================================================
 // HELPER FUNCTIONS
 // ============================================================================
 

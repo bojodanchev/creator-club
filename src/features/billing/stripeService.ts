@@ -265,8 +265,8 @@ export async function createActivationCheckout(creatorId: string): Promise<Check
       body: {
         action: 'activation',
         creatorId,
-        successUrl: `${window.location.origin}/onboarding/success?session_id={CHECKOUT_SESSION_ID}`,
-        cancelUrl: `${window.location.origin}/onboarding/canceled`,
+        successUrl: `${window.location.origin}/onboarding?success=true&session_id={CHECKOUT_SESSION_ID}`,
+        cancelUrl: `${window.location.origin}/onboarding?canceled=true`,
       },
     });
 
@@ -303,8 +303,8 @@ export async function createPlanSubscription(
         action: 'subscription',
         creatorId,
         planTier: planId,
-        successUrl: `${window.location.origin}/settings/billing?success=true`,
-        cancelUrl: `${window.location.origin}/settings/billing?canceled=true`,
+        successUrl: `${window.location.origin}/settings?tab=billing&success=true`,
+        cancelUrl: `${window.location.origin}/settings?tab=billing&canceled=true`,
       },
     });
 

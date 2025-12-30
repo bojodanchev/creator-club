@@ -3,17 +3,46 @@
 // Main entry point for Student Plus subscription and loyalty program
 // =============================================================================
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { useStudentSubscription } from '../hooks/useStudentSubscription';
 import { studentPlusService } from '../studentPlusService';
 import { STUDENT_PLUS_CONFIG, formatPrice } from '../studentPlusTypes';
 import { LoyaltyDashboard } from './LoyaltyDashboard';
 import { SubscriptionStatus } from './SubscriptionStatus';
+import { CheckCircle, XCircle } from 'lucide-react';
 
 export function StudentPlusPage() {
+  const [searchParams, setSearchParams] = useSearchParams();
   const { subscription, isLoading, isSubscribed, refetch } = useStudentSubscription();
   const [isCheckingOut, setIsCheckingOut] = useState(false);
   const [checkoutError, setCheckoutError] = useState<string | null>(null);
+  const [showSuccessMessage, setShowSuccessMessage] = useState(false);
+  const [showCancelMessage, setShowCancelMessage] = useState(false);
+
+  // Handle URL params for checkout success/cancel
+  useEffect(() => {
+    const success = searchParams.get('success');
+    const canceled = searchParams.get('canceled');
+
+    if (success === 'true') {
+      setShowSuccessMessage(true);
+      // Clear the URL params
+      setSearchParams({});
+      // Refresh subscription status
+      refetch();
+      // Auto-hide after 5 seconds
+      setTimeout(() => setShowSuccessMessage(false), 5000);
+    }
+
+    if (canceled === 'true') {
+      setShowCancelMessage(true);
+      // Clear the URL params
+      setSearchParams({});
+      // Auto-hide after 5 seconds
+      setTimeout(() => setShowCancelMessage(false), 5000);
+    }
+  }, [searchParams, setSearchParams, refetch]);
 
   const handleSubscribe = async () => {
     setIsCheckingOut(true);
@@ -43,6 +72,16 @@ export function StudentPlusPage() {
   if (isSubscribed && subscription) {
     return (
       <div className="max-w-4xl mx-auto py-8 px-4 space-y-8">
+        {/* Success notification */}
+        {showSuccessMessage && (
+          <div className="bg-emerald-50 border border-emerald-200 rounded-xl p-4 flex items-center gap-3">
+            <CheckCircle className="w-6 h-6 text-emerald-600 shrink-0" />
+            <div>
+              <p className="font-semibold text-emerald-800">Welcome to Student Plus!</p>
+              <p className="text-emerald-700 text-sm">Your subscription is now active. Start earning loyalty points!</p>
+            </div>
+          </div>
+        )}
         <SubscriptionStatus subscription={subscription} onUpdate={refetch} />
         <LoyaltyDashboard consecutiveMonths={subscription.consecutive_months} />
       </div>
@@ -52,6 +91,17 @@ export function StudentPlusPage() {
   // Non-subscriber view - sales page
   return (
     <div className="max-w-4xl mx-auto py-12 px-4">
+      {/* Cancel notification */}
+      {showCancelMessage && (
+        <div className="bg-amber-50 border border-amber-200 rounded-xl p-4 flex items-center gap-3 mb-8">
+          <XCircle className="w-6 h-6 text-amber-600 shrink-0" />
+          <div>
+            <p className="font-semibold text-amber-800">Checkout Canceled</p>
+            <p className="text-amber-700 text-sm">No worries! Your subscription was not started. Feel free to subscribe when you're ready.</p>
+          </div>
+        </div>
+      )}
+
       {/* Header */}
       <div className="text-center mb-12">
         <div className="inline-block bg-gradient-to-r from-purple-500 to-pink-500 text-white text-sm font-semibold px-4 py-1 rounded-full mb-4">

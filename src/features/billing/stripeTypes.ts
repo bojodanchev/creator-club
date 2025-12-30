@@ -72,8 +72,8 @@ export interface StripeConfig {
  */
 export const STRIPE_CONFIG: StripeConfig = {
   activation: {
-    productId: 'prod_activation_fee',
-    priceId: 'price_activation_290_eur',
+    productId: 'prod_ThBhGe4gwluiQ8',
+    priceId: 'price_1SjnKmFbO001Rr4nTKadFx23',
     amount: 290,
     type: 'one_time',
   },
@@ -85,14 +85,14 @@ export const STRIPE_CONFIG: StripeConfig = {
       platformFeePercent: 6.9,
     },
     pro: {
-      productId: 'prod_creator_pro',
-      priceId: 'price_pro_3000_eur_monthly',
+      productId: 'prod_ThBhoMU9mCS03d',
+      priceId: 'price_1SjnKnFbO001Rr4nE31ve9YU',
       monthlyAmount: 3000,
       platformFeePercent: 3.9,
     },
     scale: {
-      productId: 'prod_creator_scale',
-      priceId: 'price_scale_9900_eur_monthly',
+      productId: 'prod_ThBhNjnTJAQEFi',
+      priceId: 'price_1SjnKnFbO001Rr4nrgpXSf0h',
       monthlyAmount: 9900,
       platformFeePercent: 1.9,
     },
@@ -302,11 +302,17 @@ export interface ConnectAccountConfig {
 }
 
 export interface ConnectAccountStatus {
+  accountId: string;
   status: 'pending' | 'active' | 'restricted' | 'disabled';
   payoutsEnabled: boolean;
   chargesEnabled: boolean;
   detailsSubmitted: boolean;
-  requiresAction: boolean;
+  requirements?: {
+    currentlyDue: string[];
+    eventuallyDue: string[];
+    pendingVerification: string[];
+    disabledReason: string | null;
+  };
 }
 
 // ============================================================================
@@ -331,6 +337,7 @@ export interface PlanChangeResult {
   success: boolean;
   effectiveDate?: string;
   checkoutUrl?: string;
+  requiresCheckout?: boolean;
   error?: string;
 }
 

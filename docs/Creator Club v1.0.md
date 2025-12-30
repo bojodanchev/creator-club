@@ -635,19 +635,28 @@
 
 ### **7\. Payments & Plans – Dev задачи**
 
+> **📌 UPDATE (2025-12-30):** Pricing model has been finalized and implemented. See `Pricing модел.md` for current pricing:
+> - **Starter:** €0/month + 6.9% platform fee
+> - **Pro:** €30/month + 3.9% platform fee (starts after first sale)
+> - **Scale:** €99/month + 1.9% platform fee (starts after first sale)
+> - **Activation Fee:** €2.9 one-time
+> - **Student Plus:** €9.9/month subscription
+>
+> ✅ **IMPLEMENTED:** All Stripe Edge Functions deployed, webhook configured (LIVE mode).
+
 **Backend:**
 
 * Stripe интеграция:
 
   * Checkout session за:
 
-    * Creator планове (Creator/Business/Elite).
+    * Creator планове (Starter/Pro/Scale - updated from original Creator/Business/Elite).
 
   * Webhooks за: успешни плащания, отменени абонаменти.
 
 * Trial логика:
 
-  * при нов Creator – trial\_end\_date \+ флаг `is_trial`.
+  * при нов Creator – trial\_end\_date \+ флаг `is_trial` (marked as future enhancement).
 
 **Frontend:**
 

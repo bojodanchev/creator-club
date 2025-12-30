@@ -154,22 +154,181 @@ export interface CommunityPublicData {
 }
 
 // ============================================================================
-// PAYMENT & SUBSCRIPTION TYPES
+// BILLING & SUBSCRIPTION TYPES (Phase 1: Creator Plans)
 // ============================================================================
 
-export type PlanType = 'creator' | 'business' | 'elite';
-export type SubscriptionStatus = 'active' | 'trialing' | 'past_due' | 'canceled' | 'incomplete';
+// Plan tier types (Starter/Pro/Scale)
+export type PlanTier = 'starter' | 'pro' | 'scale';
 
+// Billing/subscription status
+export type BillingStatus =
+  | 'trialing'
+  | 'active'
+  | 'past_due'
+  | 'canceled'
+  | 'incomplete'
+  | 'incomplete_expired'
+  | 'paused';
+
+// Transaction types for billing ledger
+export type TransactionType =
+  | 'activation_fee'
+  | 'subscription'
+  | 'platform_fee'
+  | 'refund'
+  | 'payout'
+  | 'adjustment';
+
+// Transaction status
+export type TransactionStatus = 'pending' | 'completed' | 'failed' | 'refunded';
+
+// Plan feature flags (stored in billing_plans.features JSONB)
 export interface PlanFeatures {
-  max_students: number;      // -1 = unlimited
-  max_courses: number;       // -1 = unlimited
-  max_communities: number;   // -1 = unlimited
+  max_students: number;          // -1 = unlimited
+  max_courses: number;           // -1 = unlimited
+  max_communities: number;       // -1 = unlimited
   ai_enabled: boolean;
   custom_branding: boolean;
   priority_support: boolean;
-  white_label?: boolean;
+  white_label: boolean;
+  advanced_analytics: boolean;
+  api_access: boolean;
 }
 
+// Billing plan configuration (Starter/Pro/Scale)
+export interface BillingPlan {
+  id: string;
+  tier: PlanTier;
+  name: string;
+  description: string | null;
+  price_monthly_cents: number;
+  platform_fee_percent: number;
+  stripe_product_id: string | null;
+  stripe_price_id: string | null;
+  features: PlanFeatures;
+  is_active: boolean;
+  created_at: string;
+  updated_at: string;
+}
+
+// Creator billing state (per-creator)
+export interface CreatorBilling {
+  id: string;
+  creator_id: string;
+  plan_id: string;
+  status: BillingStatus;
+  stripe_customer_id: string | null;
+  stripe_subscription_id: string | null;
+  stripe_account_id: string | null;
+  stripe_account_status: string | null;
+  has_first_sale: boolean;
+  first_sale_at: string | null;
+  monthly_fee_active: boolean;
+  current_period_start: string | null;
+  current_period_end: string | null;
+  trial_end: string | null;
+  cancel_at_period_end: boolean;
+  canceled_at: string | null;
+  activation_fee_paid: boolean;
+  activation_fee_paid_at: string | null;
+  created_at: string;
+  updated_at: string;
+  // Joined data
+  plan?: BillingPlan;
+}
+
+// Billing transaction record (immutable ledger)
+export interface BillingTransaction {
+  id: string;
+  creator_id: string;
+  type: TransactionType;
+  status: TransactionStatus;
+  amount_cents: number;
+  currency: string;
+  description: string | null;
+  stripe_payment_intent_id: string | null;
+  stripe_invoice_id: string | null;
+  stripe_charge_id: string | null;
+  stripe_transfer_id: string | null;
+  related_sale_id: string | null;
+  related_subscription_id: string | null;
+  metadata: Record<string, unknown>;
+  created_at: string;
+  processed_at: string | null;
+}
+
+// Creator sale record (for platform fee tracking)
+export interface CreatorSale {
+  id: string;
+  creator_id: string;
+  buyer_id: string | null;
+  product_type: 'course' | 'membership' | 'product';
+  product_id: string | null;
+  product_name: string;
+  sale_amount_cents: number;
+  platform_fee_cents: number;
+  stripe_fee_cents: number;
+  net_amount_cents: number;
+  currency: string;
+  stripe_payment_intent_id: string | null;
+  stripe_charge_id: string | null;
+  stripe_transfer_id: string | null;
+  status: TransactionStatus;
+  refunded_at: string | null;
+  created_at: string;
+  completed_at: string | null;
+}
+
+// Convenience types for UI
+
+// Plan display info for pricing page
+export interface PlanDisplayInfo {
+  tier: PlanTier;
+  name: string;
+  priceMonthly: string;           // Formatted: "EUR 30"
+  platformFee: string;            // Formatted: "3.9%"
+  features: string[];             // Human-readable feature list
+  recommended?: boolean;
+  breakEvenRevenue?: string;      // "EUR 750/month"
+}
+
+// Billing dashboard data
+export interface BillingDashboardData {
+  currentPlan: BillingPlan;
+  billing: CreatorBilling;
+  currentPeriodRevenue: number;   // This month's sales in cents
+  platformFeesThisPeriod: number; // Fees taken this period in cents
+  totalRevenue: number;           // All-time revenue in cents
+  recentTransactions: BillingTransaction[];
+  nextInvoiceDate: string | null;
+  nextInvoiceAmount: number | null;
+}
+
+// Plan limits for feature gating
+export interface PlanLimitsInfo {
+  canAddStudent: boolean;
+  canAddCourse: boolean;
+  canAddCommunity: boolean;
+  hasAiAccess: boolean;
+  hasCustomBranding: boolean;
+  hasPrioritySupport: boolean;
+  hasWhiteLabel: boolean;
+  hasAdvancedAnalytics: boolean;
+  hasApiAccess: boolean;
+  usage: {
+    students: { current: number; max: number };
+    courses: { current: number; max: number };
+    communities: { current: number; max: number };
+  };
+}
+
+// Legacy types for backward compatibility (deprecated, use BillingPlan/CreatorBilling)
+/** @deprecated Use PlanTier instead */
+export type PlanType = 'creator' | 'business' | 'elite';
+/** @deprecated Use BillingStatus instead */
+export type SubscriptionStatus = 'active' | 'trialing' | 'past_due' | 'canceled' | 'incomplete';
+
+/** @deprecated Use BillingPlan instead */
 export interface PaymentPlan {
   id: string;
   name: string;
@@ -183,6 +342,7 @@ export interface PaymentPlan {
   created_at: string;
 }
 
+/** @deprecated Use CreatorBilling instead */
 export interface Subscription {
   id: string;
   user_id: string;
