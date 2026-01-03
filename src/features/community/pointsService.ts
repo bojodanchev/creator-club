@@ -181,7 +181,7 @@ function calculateLevel(totalPoints: number): number {
 
 /**
  * Gets the point transactions history for a user in a community
- * @param userId - The user's ID
+ * @param userId - The auth user's ID (not profile ID)
  * @param communityId - The community's ID
  * @param limit - Number of transactions to return (default: 50)
  * @returns Array of point transaction records
@@ -191,10 +191,21 @@ export async function getPointTransactions(
   communityId: string,
   limit: number = 50
 ): Promise<DbPointTransaction[]> {
+  // First, get the profile ID for this user (FK references profiles.id, not user_id)
+  const { data: profile, error: profileError } = await supabase
+    .from('profiles')
+    .select('id')
+    .eq('user_id', userId)
+    .single();
+
+  if (profileError || !profile) {
+    return [];
+  }
+
   const { data, error } = await supabase
     .from('point_transactions')
     .select('*')
-    .eq('user_id', userId)
+    .eq('user_id', profile.id)
     .eq('community_id', communityId)
     .order('created_at', { ascending: false })
     .limit(limit);

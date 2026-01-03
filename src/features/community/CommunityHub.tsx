@@ -734,7 +734,7 @@ const CommunityHub: React.FC<CommunityHubProps> = ({ showCreateModal = false, on
             <div className="flex gap-4">
               <img
                 src={profile?.avatar_url || `https://ui-avatars.com/api/?name=${encodeURIComponent(profile?.full_name || 'User')}&background=6366f1&color=fff`}
-                className="w-10 h-10 rounded-full"
+                className="w-10 h-10 rounded-full object-cover"
                 alt="Me"
               />
               <div className="flex-1">
@@ -860,7 +860,7 @@ const CommunityHub: React.FC<CommunityHubProps> = ({ showCreateModal = false, on
                   >
                     <img
                       src={post.author?.avatar_url || `https://ui-avatars.com/api/?name=${encodeURIComponent(post.author?.full_name || 'User')}&background=6366f1&color=fff`}
-                      className="w-10 h-10 rounded-full hover:ring-2 hover:ring-indigo-300 transition-all cursor-pointer"
+                      className="w-10 h-10 rounded-full object-cover hover:ring-2 hover:ring-indigo-300 transition-all cursor-pointer"
                       alt={post.author?.full_name || 'User'}
                     />
                   </button>
@@ -1019,7 +1019,7 @@ const CommunityHub: React.FC<CommunityHubProps> = ({ showCreateModal = false, on
                             >
                               <img
                                 src={comment.author?.avatar_url || `https://ui-avatars.com/api/?name=${encodeURIComponent(comment.author?.full_name || 'User')}&background=6366f1&color=fff`}
-                                className="w-8 h-8 rounded-full hover:ring-2 hover:ring-indigo-300 transition-all cursor-pointer"
+                                className="w-8 h-8 rounded-full object-cover hover:ring-2 hover:ring-indigo-300 transition-all cursor-pointer"
                                 alt={comment.author?.full_name || 'User'}
                               />
                             </button>
@@ -1046,7 +1046,7 @@ const CommunityHub: React.FC<CommunityHubProps> = ({ showCreateModal = false, on
                     <div className="flex gap-3">
                       <img
                         src={profile?.avatar_url || `https://ui-avatars.com/api/?name=${encodeURIComponent(profile?.full_name || 'User')}&background=6366f1&color=fff`}
-                        className="w-8 h-8 rounded-full shrink-0"
+                        className="w-8 h-8 rounded-full object-cover shrink-0"
                         alt="Me"
                       />
                       <div className="flex-1 flex gap-2">
@@ -1255,7 +1255,7 @@ const CommunityHub: React.FC<CommunityHubProps> = ({ showCreateModal = false, on
                         >
                           <img
                             src={member.user.avatar_url || `https://ui-avatars.com/api/?name=${encodeURIComponent(member.user.full_name)}&background=6366f1&color=fff`}
-                            className="w-10 h-10 rounded-full hover:ring-2 hover:ring-indigo-300 transition-all cursor-pointer"
+                            className="w-10 h-10 rounded-full object-cover hover:ring-2 hover:ring-indigo-300 transition-all cursor-pointer"
                             alt={member.user.full_name}
                           />
                         </button>

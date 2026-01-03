@@ -80,15 +80,16 @@ export function usePlanLimits(): PlanLimitsHook {
   useEffect(() => {
     const fetchPlanAndUsage = async () => {
       // Only apply limits to creators
-      if (!user || role !== 'creator') {
+      if (!profile || role !== 'creator') {
         setLoading(false);
         return;
       }
 
       try {
         // Fetch plan tier using RPC function
+        // Use profile.id because creator_id columns reference profiles.id
         const { data: tierData, error: tierError } = await supabase
-          .rpc('get_creator_plan_tier', { p_creator_id: user.id });
+          .rpc('get_creator_plan_tier', { p_creator_id: profile.id });
 
         if (tierError) {
           console.error('Error fetching plan tier:', tierError);
@@ -103,7 +104,7 @@ export function usePlanLimits(): PlanLimitsHook {
         const { data: communities } = await supabase
           .from('communities')
           .select('id')
-          .eq('creator_id', user.id);
+          .eq('creator_id', profile.id);
 
         if (communities && communities.length > 0) {
           const communityIds = communities.map(c => c.id);
@@ -126,7 +127,7 @@ export function usePlanLimits(): PlanLimitsHook {
         const { count: coursesResult } = await supabase
           .from('courses')
           .select('id', { count: 'exact', head: true })
-          .eq('creator_id', user.id);
+          .eq('creator_id', profile.id);
 
         setCourseCount(coursesResult || 0);
 
@@ -134,7 +135,7 @@ export function usePlanLimits(): PlanLimitsHook {
         const { count: communitiesResult } = await supabase
           .from('communities')
           .select('id', { count: 'exact', head: true })
-          .eq('creator_id', user.id);
+          .eq('creator_id', profile.id);
 
         setCommunityCount(communitiesResult || 0);
       } catch (error) {
@@ -145,7 +146,7 @@ export function usePlanLimits(): PlanLimitsHook {
     };
 
     fetchPlanAndUsage();
-  }, [user, role]);
+  }, [profile, role]);
 
   // Calculate usage info
   const usage: PlanUsage = useMemo(() => ({

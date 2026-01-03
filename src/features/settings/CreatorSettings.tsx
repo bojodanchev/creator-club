@@ -41,18 +41,19 @@ const CreatorSettings: React.FC = () => {
   const [connectLoading, setConnectLoading] = useState(false);
 
   useEffect(() => {
-    if (user?.id) {
+    if (profile?.id) {
       loadCreatorProfile();
       loadConnectStatus();
     }
-  }, [user?.id]);
+  }, [profile?.id]);
 
   const loadCreatorProfile = async () => {
-    if (!user?.id) return;
+    if (!profile?.id) return;
 
     setLoading(true);
     try {
-      const creatorProfile = await getCreatorProfile(user.id);
+      // Use profile.id because creator_profiles.creator_id references profiles.id
+      const creatorProfile = await getCreatorProfile(profile.id);
       if (creatorProfile) {
         setFormData({
           brand_name: creatorProfile.brand_name || '',
@@ -69,9 +70,10 @@ const CreatorSettings: React.FC = () => {
   };
 
   const loadConnectStatus = async () => {
-    if (!user?.id) return;
+    if (!profile?.id) return;
     try {
-      const status = await getConnectAccountStatus(user.id);
+      // Use profile.id for Stripe Connect account lookup
+      const status = await getConnectAccountStatus(profile.id);
       setConnectStatus(status);
     } catch (error) {
       console.error('Error loading connect status:', error);
@@ -79,13 +81,14 @@ const CreatorSettings: React.FC = () => {
   };
 
   const handleSetupPayouts = async () => {
-    if (!user?.id || !profile?.email) return;
+    if (!profile?.id || !profile?.email) return;
 
     setConnectLoading(true);
     try {
       // Create account if doesn't exist
       if (!connectStatus) {
-        const result = await createConnectAccount(user.id, profile.email);
+        // Use profile.id for Stripe Connect account creation
+        const result = await createConnectAccount(profile.id, profile.email);
         if (!result.success) {
           setMessage({ type: 'error', text: result.error || 'Failed to create payout account' });
           return;
@@ -93,7 +96,7 @@ const CreatorSettings: React.FC = () => {
       }
 
       // Get onboarding link
-      const onboardingUrl = await getConnectOnboardingLink(user.id);
+      const onboardingUrl = await getConnectOnboardingLink(profile.id);
       if (onboardingUrl) {
         window.location.href = onboardingUrl;
       } else {
@@ -108,13 +111,14 @@ const CreatorSettings: React.FC = () => {
   };
 
   const handleSave = async () => {
-    if (!user?.id) return;
+    if (!profile?.id) return;
 
     setSaving(true);
     setMessage(null);
 
     try {
-      await updateCreatorProfile(user.id, {
+      // Use profile.id because creator_profiles.creator_id references profiles.id
+      await updateCreatorProfile(profile.id, {
         brand_name: formData.brand_name || null,
         bio: formData.bio || null,
         timezone: formData.timezone,

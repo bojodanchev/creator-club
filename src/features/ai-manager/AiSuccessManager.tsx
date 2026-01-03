@@ -60,17 +60,18 @@ const AiSuccessManager: React.FC = () => {
 
   // Load students on mount and when filter changes
   useEffect(() => {
-    if (user) {
+    if (profile) {
       loadStudents(statusFilter);
     }
-  }, [user, statusFilter]);
+  }, [profile, statusFilter]);
 
   // Load most recent conversation on mount
   useEffect(() => {
     const loadConversation = async () => {
-      if (!user) return;
+      if (!profile) return;
 
-      const conversation = await getRecentConversation(user.id, 'success_manager');
+      // Use profile.id because ai_conversations.user_id references profiles.id
+      const conversation = await getRecentConversation(profile.id, 'success_manager');
 
       if (conversation && conversation.messages && conversation.messages.length > 0) {
         // Convert AIMessageRecord[] to AIMessage[]
@@ -85,14 +86,14 @@ const AiSuccessManager: React.FC = () => {
       }
     };
 
-    if (user && messages.length === 1) {
+    if (profile && messages.length === 1) {
       loadConversation();
     }
-  }, [user]);
+  }, [profile]);
 
   // Auto-save conversation after messages change (debounced with race condition protection)
   useEffect(() => {
-    if (!user || messages.length <= 1) return;
+    if (!profile || messages.length <= 1) return;
 
     // Increment version to track this save operation
     const currentVersion = ++saveVersionRef.current;
@@ -111,8 +112,9 @@ const AiSuccessManager: React.FC = () => {
         timestamp: m.timestamp.toISOString(),
       }));
 
+      // Use profile.id because ai_conversations.user_id references profiles.id
       const saved = await saveConversation(
-        user.id,
+        profile.id,
         'success_manager',
         messagesToSave,
         undefined,
@@ -132,16 +134,17 @@ const AiSuccessManager: React.FC = () => {
     const timeoutId = setTimeout(saveCurrentConversation, 2000);
 
     return () => clearTimeout(timeoutId);
-  }, [messages, user, currentConversation]);
+  }, [messages, profile, currentConversation]);
 
   const loadStudents = async (filter: StudentStatus | 'all') => {
-    if (!user) return;
+    if (!profile) return;
 
     setIsLoadingStudents(true);
     try {
+      // Use profile.id because dashboard services query courses.creator_id
       const result = filter === 'all'
-        ? await getAllStudents(user.id)
-        : await getStudentsByStatus(user.id, filter);
+        ? await getAllStudents(profile.id)
+        : await getStudentsByStatus(profile.id, filter);
       setStudents(result);
     } catch (error) {
       console.error('Error loading students:', error);
@@ -151,8 +154,9 @@ const AiSuccessManager: React.FC = () => {
   };
 
   const loadHistory = async () => {
-    if (!user) return;
-    const history = await getConversationHistory(user.id, 'success_manager');
+    if (!profile) return;
+    // Use profile.id because ai_conversations.user_id references profiles.id
+    const history = await getConversationHistory(profile.id, 'success_manager');
     setConversationHistory(history);
     setShowConversationHistory(true);
   };
@@ -177,11 +181,12 @@ const AiSuccessManager: React.FC = () => {
   };
 
   const handleRecalculateRiskScores = async () => {
-    if (!user) return;
+    if (!profile) return;
 
     setIsRecalculating(true);
     try {
-      const result = await recalculateAllStudentHealth(user.id);
+      // Use profile.id because it queries courses.creator_id
+      const result = await recalculateAllStudentHealth(profile.id);
       console.log(`Recalculated health for ${result.updated} students (${result.errors} errors)`);
 
       // Reload students after recalculation
@@ -202,7 +207,7 @@ const AiSuccessManager: React.FC = () => {
   };
 
   const handleSend = async () => {
-    if (!input.trim() || !user) return;
+    if (!input.trim() || !profile) return;
 
     const userMsg: AIMessage = { role: 'user', text: input, timestamp: new Date() };
     setMessages(prev => [...prev, userMsg]);
@@ -240,10 +245,11 @@ const AiSuccessManager: React.FC = () => {
     const historyForApi = messages.map(m => ({ role: m.role, text: m.text }));
 
     // Call enhanced sendMentorMessage with creatorId, includeStats, and userName
+    // Use profile.id because it queries courses.creator_id for stats
     const response = await sendMentorMessage(
       contextMessage,
       historyForApi,
-      user.id, // Pass creatorId for personalization
+      profile.id, // Pass creatorId for personalization
       isStatsCommand, // Include stats if /stats command or overview/dashboard keywords detected
       profile?.full_name // Pass user's name for personalized responses
     );
@@ -254,7 +260,7 @@ const AiSuccessManager: React.FC = () => {
   };
 
   const generateReport = async () => {
-    if (!user) return;
+    if (!profile) return;
 
     setIsLoadingReport(true);
 

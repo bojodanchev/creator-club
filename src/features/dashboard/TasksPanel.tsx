@@ -14,7 +14,7 @@ import {
 } from './taskService';
 
 const TasksPanel: React.FC = () => {
-  const { user } = useAuth();
+  const { user, profile } = useAuth();
   const [tasks, setTasks] = useState<DbTask[]>([]);
   const [loading, setLoading] = useState(true);
   const [filter, setFilter] = useState<TaskStatus | 'all'>('all');
@@ -26,17 +26,18 @@ const TasksPanel: React.FC = () => {
   });
 
   useEffect(() => {
-    if (user?.id) {
+    if (profile?.id) {
       loadTasks();
     }
-  }, [user?.id]);
+  }, [profile?.id]);
 
   const loadTasks = async () => {
-    if (!user?.id) return;
+    if (!profile?.id) return;
 
     setLoading(true);
     try {
-      const data = await getTasks(user.id);
+      // Use profile.id because tasks.creator_id references profiles.id
+      const data = await getTasks(profile.id);
       setTasks(data);
     } catch (error) {
       console.error('Error loading tasks:', error);
@@ -47,10 +48,11 @@ const TasksPanel: React.FC = () => {
 
   const handleCreateTask = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!user?.id || !newTask.title.trim()) return;
+    if (!profile?.id || !newTask.title.trim()) return;
 
+    // Use profile.id because tasks.creator_id references profiles.id
     const task = await createTask(
-      user.id,
+      profile.id,
       newTask.title,
       newTask.description || undefined,
       newTask.dueDate || undefined

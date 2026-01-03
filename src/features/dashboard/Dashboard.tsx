@@ -67,14 +67,15 @@ const Dashboard: React.FC = () => {
   const [creatingCommunity, setCreatingCommunity] = useState(false);
 
   useEffect(() => {
-    if (user?.id) {
+    if (profile?.id) {
       loadDashboardData();
       checkCreatorCommunity();
     }
-  }, [user?.id]);
+  }, [profile?.id]);
 
   const checkCreatorCommunity = async () => {
     if (!user?.id) return;
+    // getCreatorCommunities has built-in profile lookup, accepts auth user ID
     const communities = await getCreatorCommunities(user.id);
     setHasCommunity(communities.length > 0);
   };
@@ -104,14 +105,15 @@ const Dashboard: React.FC = () => {
   };
 
   const loadDashboardData = async () => {
-    if (!user?.id) return;
+    if (!profile?.id) return;
 
     setLoading(true);
     try {
+      // Dashboard services expect profile.id (creator_id references profiles.id)
       const [statsData, riskData, activity] = await Promise.all([
-        getDashboardStats(user.id),
-        getAtRiskStudents(user.id),
-        getWeeklyActivityData(user.id),
+        getDashboardStats(profile.id),
+        getAtRiskStudents(profile.id),
+        getWeeklyActivityData(profile.id),
       ]);
 
       setStats(statsData);

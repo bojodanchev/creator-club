@@ -4,6 +4,7 @@ import { View } from '../core/types';
 import { NAV_ITEMS, CREATOR_NAV_ITEMS } from '../core/constants';
 import { useAuth } from '../core/contexts/AuthContext';
 import CommunitySwitcher from './CommunitySwitcher';
+import { Avatar } from './Avatar';
 
 interface SidebarProps {
   currentView: View;
@@ -148,10 +149,11 @@ const Sidebar: React.FC<SidebarProps> = ({ currentView, setCurrentView, isOpen, 
             Sign Out
           </button>
           <div className="mt-4 flex items-center gap-3 px-4">
-            <img
-              src={profile?.avatar_url || "https://picsum.photos/seed/creator/40/40"}
-              alt={profile?.full_name || "User"}
-              className="w-8 h-8 rounded-full border border-slate-600"
+            <Avatar
+              src={profile?.avatar_url}
+              name={profile?.full_name}
+              size="sm"
+              className="border border-slate-600"
             />
             <div className="flex-1 overflow-hidden">
               <p className="text-sm font-medium truncate">{profile?.full_name || 'User'}</p>

@@ -17,7 +17,7 @@ import {
 import { EventType } from '../../core/supabase/database.types';
 
 const CalendarView: React.FC = () => {
-  const { user, role } = useAuth();
+  const { user, profile, role } = useAuth();
   const [loading, setLoading] = useState(true);
   const [events, setEvents] = useState<EventWithDetails[]>([]);
   const [currentDate, setCurrentDate] = useState(new Date());
@@ -37,21 +37,23 @@ const CalendarView: React.FC = () => {
   const isCreator = role === 'creator' || role === 'superadmin';
 
   useEffect(() => {
-    if (user?.id) {
+    if (profile?.id) {
       loadEvents();
     }
-  }, [user?.id, role]);
+  }, [profile?.id, role]);
 
   const loadEvents = async () => {
-    if (!user?.id) return;
+    if (!profile?.id) return;
 
     setLoading(true);
     try {
       let data: EventWithDetails[];
       if (isCreator) {
-        data = await getCreatorEvents(user.id);
+        // Use profile.id because events.creator_id references profiles.id
+        data = await getCreatorEvents(profile.id);
       } else {
-        data = await getUpcomingEvents(user.id);
+        // Use profile.id because event_attendees.user_id references profiles.id
+        data = await getUpcomingEvents(profile.id);
       }
       setEvents(data);
     } catch (error) {
@@ -62,15 +64,16 @@ const CalendarView: React.FC = () => {
   };
 
   const handleCreateEvent = async () => {
-    if (!user?.id || !newEventTitle || !newEventDate || !newEventStartTime || !newEventEndTime) return;
+    if (!profile?.id || !newEventTitle || !newEventDate || !newEventStartTime || !newEventEndTime) return;
 
     setCreating(true);
     try {
       const startDateTime = new Date(`${newEventDate}T${newEventStartTime}`);
       const endDateTime = new Date(`${newEventDate}T${newEventEndTime}`);
 
+      // Use profile.id because events.creator_id references profiles.id
       const event = await createEvent(
-        user.id,
+        profile.id,
         newEventTitle,
         startDateTime,
         endDateTime,
@@ -92,13 +95,14 @@ const CalendarView: React.FC = () => {
   };
 
   const handleRsvp = async (eventId: string, isAttending: boolean) => {
-    if (!user?.id) return;
+    if (!profile?.id) return;
 
     try {
+      // Use profile.id because event_attendees.user_id references profiles.id
       if (isAttending) {
-        await cancelRsvp(user.id, eventId);
+        await cancelRsvp(profile.id, eventId);
       } else {
-        await rsvpToEvent(user.id, eventId, 'attending');
+        await rsvpToEvent(profile.id, eventId, 'attending');
       }
       await loadEvents();
     } catch (error) {

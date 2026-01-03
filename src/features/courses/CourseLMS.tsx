@@ -239,7 +239,7 @@ const CourseLMS: React.FC = () => {
     setEditingModule(null);
     // Reload the selected course to get updated modules
     if (selectedCourse) {
-      const updated = await getCourseWithDetails(selectedCourse.id, user?.id);
+      const updated = await getCourseWithDetails(selectedCourse.id, profile?.id);
       if (updated) setSelectedCourse(updated);
     }
   };
@@ -248,7 +248,7 @@ const CourseLMS: React.FC = () => {
     setShowModuleModal(false);
     setEditingModule(null);
     if (selectedCourse) {
-      const updated = await getCourseWithDetails(selectedCourse.id, user?.id);
+      const updated = await getCourseWithDetails(selectedCourse.id, profile?.id);
       if (updated) setSelectedCourse(updated);
     }
   };
@@ -270,7 +270,7 @@ const CourseLMS: React.FC = () => {
     setShowLessonModal(false);
     setEditingLesson(null);
     if (selectedCourse) {
-      const updated = await getCourseWithDetails(selectedCourse.id, user?.id);
+      const updated = await getCourseWithDetails(selectedCourse.id, profile?.id);
       if (updated) setSelectedCourse(updated);
     }
   };
@@ -280,7 +280,7 @@ const CourseLMS: React.FC = () => {
     setEditingLesson(null);
     setActiveLesson(null);
     if (selectedCourse) {
-      const updated = await getCourseWithDetails(selectedCourse.id, user?.id);
+      const updated = await getCourseWithDetails(selectedCourse.id, profile?.id);
       if (updated) setSelectedCourse(updated);
     }
   };
@@ -302,7 +302,7 @@ const CourseLMS: React.FC = () => {
     await reorderModules(moduleOrders);
 
     // Reload
-    const updated = await getCourseWithDetails(selectedCourse.id, user?.id);
+    const updated = await getCourseWithDetails(selectedCourse.id, profile?.id);
     if (updated) setSelectedCourse(updated);
   };
 
@@ -325,7 +325,7 @@ const CourseLMS: React.FC = () => {
     await reorderLessons(lessonOrders);
 
     // Reload
-    const updated = await getCourseWithDetails(selectedCourse.id, user?.id);
+    const updated = await getCourseWithDetails(selectedCourse.id, profile?.id);
     if (updated) setSelectedCourse(updated);
   };
 

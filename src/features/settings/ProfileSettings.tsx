@@ -102,11 +102,11 @@ const ProfileSettings: React.FC = () => {
         {/* Avatar Preview with Upload Overlay */}
         <div className="relative group">
           <img
-            src={formData.avatar_url || authProfile?.avatar_url || 'https://picsum.photos/seed/profile/100/100'}
+            src={formData.avatar_url || authProfile?.avatar_url || `https://ui-avatars.com/api/?name=${encodeURIComponent(formData.full_name || authProfile?.full_name || 'User')}&background=6366f1&color=fff&size=96&bold=true`}
             alt="Profile"
             className="w-24 h-24 rounded-full border-2 border-slate-200 object-cover"
             onError={(e) => {
-              (e.target as HTMLImageElement).src = 'https://picsum.photos/seed/profile/100/100';
+              (e.target as HTMLImageElement).src = `https://ui-avatars.com/api/?name=${encodeURIComponent(formData.full_name || 'User')}&background=6366f1&color=fff&size=96&bold=true`;
             }}
           />
           {/* Upload overlay */}
