@@ -21,6 +21,7 @@ import {
   deleteChannel,
 } from './communityService';
 import UserProfilePopup from './UserProfilePopup';
+import CommunityPricingSettings from './components/CommunityPricingSettings';
 import {
   getUserPoints,
   getCommunityLeaderboard,
@@ -75,6 +76,9 @@ const CommunityHub: React.FC<CommunityHubProps> = ({ showCreateModal = false, on
   const [channelDescription, setChannelDescription] = useState('');
   const [isSavingChannel, setIsSavingChannel] = useState(false);
   const [showChannelMenu, setShowChannelMenu] = useState<string | null>(null);
+
+  // Community settings state
+  const [showPricingSettings, setShowPricingSettings] = useState(false);
 
   // Image upload and emoji picker state
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -583,7 +587,18 @@ const CommunityHub: React.FC<CommunityHubProps> = ({ showCreateModal = false, on
 
           {selectedCommunity && (
             <div className="mb-4">
-              <h2 className="font-semibold text-slate-900 truncate">{selectedCommunity.name}</h2>
+              <div className="flex items-center justify-between">
+                <h2 className="font-semibold text-slate-900 truncate">{selectedCommunity.name}</h2>
+                {isOwner && (
+                  <button
+                    onClick={() => setShowPricingSettings(true)}
+                    className="p-1.5 text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-lg transition-colors"
+                    title="Community Settings"
+                  >
+                    <Settings size={16} />
+                  </button>
+                )}
+              </div>
               {selectedCommunity.description && (
                 <p className="text-xs text-slate-500 mt-1 line-clamp-2">{selectedCommunity.description}</p>
               )}
@@ -1288,6 +1303,37 @@ const CommunityHub: React.FC<CommunityHubProps> = ({ showCreateModal = false, on
                   })}
                 </div>
               )}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Community Pricing Settings Modal */}
+      {showPricingSettings && selectedCommunity && isOwner && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-6">
+          <div className="bg-white rounded-xl w-full max-w-lg max-h-[80vh] overflow-y-auto">
+            <div className="p-6 border-b border-slate-200">
+              <div className="flex items-center justify-between">
+                <div>
+                  <h3 className="text-xl font-bold text-slate-900">Community Settings</h3>
+                  <p className="text-sm text-slate-500">Configure pricing for {selectedCommunity.name}</p>
+                </div>
+                <button
+                  onClick={() => setShowPricingSettings(false)}
+                  className="text-slate-400 hover:text-slate-600"
+                >
+                  <X size={20} />
+                </button>
+              </div>
+            </div>
+            <div className="p-6">
+              <CommunityPricingSettings
+                communityId={selectedCommunity.id}
+                onSaved={() => {
+                  setShowPricingSettings(false);
+                  refreshCommunities();
+                }}
+              />
             </div>
           </div>
         </div>
