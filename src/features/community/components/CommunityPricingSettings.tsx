@@ -1,22 +1,19 @@
 // ============================================================================
 // COMMUNITY PRICING SETTINGS COMPONENT
 // Allows creators to configure community pricing (free, one-time, or monthly)
+// Self-contained: fetches data internally and saves via service
 // ============================================================================
 
 import React, { useState, useEffect } from 'react';
-import { DollarSign, Users, Calendar, Lock } from 'lucide-react';
+import { DollarSign, Users, Calendar, Lock, Loader2, AlertCircle } from 'lucide-react';
+import { supabase } from '../../../core/supabase/client';
+import { updateCommunityPricing } from '../communityPaymentService';
 
 export type PricingType = 'free' | 'one_time' | 'monthly';
 
 export interface CommunityPricingSettingsProps {
-  community: {
-    id: string;
-    name: string;
-    pricing_type: PricingType;
-    price_cents: number;
-  };
-  onSave: (pricing: { type: PricingType; priceCents: number }) => Promise<void>;
-  isLoading?: boolean;
+  communityId: string;
+  onSaved?: () => void;
 }
 
 interface PricingOption {
@@ -24,6 +21,13 @@ interface PricingOption {
   label: string;
   description: string;
   icon: React.ElementType;
+}
+
+interface CommunityData {
+  id: string;
+  name: string;
+  pricing_type: PricingType | null;
+  price_cents: number | null;
 }
 
 const PRICING_OPTIONS: PricingOption[] = [
@@ -50,15 +54,56 @@ const PRICING_OPTIONS: PricingOption[] = [
 const PLATFORM_FEE_PERCENT = 6.9;
 
 const CommunityPricingSettings: React.FC<CommunityPricingSettingsProps> = ({
-  community,
-  onSave,
-  isLoading = false,
+  communityId,
+  onSaved,
 }) => {
-  const [selectedType, setSelectedType] = useState<PricingType>(community.pricing_type);
-  const [priceEuros, setPriceEuros] = useState<string>(
-    community.price_cents > 0 ? (community.price_cents / 100).toFixed(2) : ''
-  );
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [communityName, setCommunityName] = useState<string>('');
+  const [selectedType, setSelectedType] = useState<PricingType>('free');
+  const [priceEuros, setPriceEuros] = useState<string>('');
   const [isSaving, setIsSaving] = useState(false);
+
+  // Fetch community data on mount
+  useEffect(() => {
+    async function fetchCommunity() {
+      setIsLoading(true);
+      setError(null);
+
+      try {
+        const { data, error: fetchError } = await supabase
+          .from('communities')
+          .select('id, name, pricing_type, price_cents')
+          .eq('id', communityId)
+          .single();
+
+        if (fetchError) {
+          console.error('Error fetching community:', fetchError);
+          setError('Failed to load community settings');
+          return;
+        }
+
+        if (!data) {
+          setError('Community not found');
+          return;
+        }
+
+        const community = data as CommunityData;
+        setCommunityName(community.name);
+        setSelectedType(community.pricing_type || 'free');
+        if (community.price_cents && community.price_cents > 0) {
+          setPriceEuros((community.price_cents / 100).toFixed(2));
+        }
+      } catch (err) {
+        console.error('Exception fetching community:', err);
+        setError('An unexpected error occurred');
+      } finally {
+        setIsLoading(false);
+      }
+    }
+
+    fetchCommunity();
+  }, [communityId]);
 
   // Reset price when switching to free
   useEffect(() => {
@@ -84,11 +129,23 @@ const CommunityPricingSettings: React.FC<CommunityPricingSettingsProps> = ({
     if (!hasValidPrice || isSaving) return;
 
     setIsSaving(true);
+    setError(null);
+
     try {
-      await onSave({
+      const result = await updateCommunityPricing(communityId, {
         type: selectedType,
         priceCents: selectedType === 'free' ? 0 : priceInCents,
       });
+
+      if (!result.success) {
+        setError(result.error || 'Failed to save pricing');
+        return;
+      }
+
+      onSaved?.();
+    } catch (err) {
+      console.error('Exception saving pricing:', err);
+      setError('An unexpected error occurred');
     } finally {
       setIsSaving(false);
     }
@@ -102,15 +159,37 @@ const CommunityPricingSettings: React.FC<CommunityPricingSettingsProps> = ({
     }
   };
 
+  // Loading state
+  if (isLoading) {
+    return (
+      <div className="flex items-center justify-center py-12">
+        <Loader2 className="w-8 h-8 animate-spin text-indigo-600" />
+      </div>
+    );
+  }
+
   return (
-    <div className="bg-white rounded-lg border border-slate-200 shadow-sm p-6">
-      <h3 className="text-lg font-semibold text-slate-900 mb-1">Community Pricing</h3>
-      <p className="text-sm text-slate-500 mb-6">
-        Choose how members can access {community.name}
-      </p>
+    <div className="space-y-6">
+      {/* Error Alert */}
+      {error && (
+        <div className="p-4 bg-red-50 border border-red-200 rounded-lg flex items-start gap-3">
+          <AlertCircle className="w-5 h-5 text-red-600 shrink-0 mt-0.5" />
+          <div>
+            <p className="text-sm font-medium text-red-800">Error</p>
+            <p className="text-sm text-red-700">{error}</p>
+          </div>
+        </div>
+      )}
+
+      <div>
+        <h4 className="text-base font-medium text-slate-900 mb-1">Community Pricing</h4>
+        <p className="text-sm text-slate-500">
+          Choose how members can access {communityName}
+        </p>
+      </div>
 
       {/* Pricing Type Selection */}
-      <div className="space-y-3 mb-6">
+      <div className="space-y-3">
         {PRICING_OPTIONS.map((option) => {
           const Icon = option.icon;
           const isSelected = selectedType === option.type;
@@ -169,7 +248,7 @@ const CommunityPricingSettings: React.FC<CommunityPricingSettingsProps> = ({
 
       {/* Price Input (only for paid options) */}
       {isPaidOption && (
-        <div className="mb-6">
+        <div>
           <label className="block text-sm font-medium text-slate-700 mb-2">
             Price
           </label>
@@ -207,7 +286,7 @@ const CommunityPricingSettings: React.FC<CommunityPricingSettingsProps> = ({
 
       {/* Platform Fee Info Box */}
       {isPaidOption && priceEuros && parseFloat(priceEuros) >= 0.5 && (
-        <div className="mb-6 p-4 bg-slate-50 rounded-lg border border-slate-200">
+        <div className="p-4 bg-slate-50 rounded-lg border border-slate-200">
           <div className="flex items-start gap-3">
             <div className="w-8 h-8 rounded-full bg-indigo-100 flex items-center justify-center shrink-0">
               <DollarSign size={16} className="text-indigo-600" />
@@ -230,35 +309,16 @@ const CommunityPricingSettings: React.FC<CommunityPricingSettingsProps> = ({
       {/* Save Button */}
       <button
         onClick={handleSave}
-        disabled={isSaving || isLoading || !hasValidPrice}
+        disabled={isSaving || !hasValidPrice}
         className="
           w-full py-3 px-4 rounded-lg font-medium transition-colors
           bg-indigo-600 text-white hover:bg-indigo-700
           disabled:bg-slate-300 disabled:text-slate-500 disabled:cursor-not-allowed
         "
       >
-        {isSaving || isLoading ? (
+        {isSaving ? (
           <span className="flex items-center justify-center gap-2">
-            <svg
-              className="animate-spin h-5 w-5"
-              xmlns="http://www.w3.org/2000/svg"
-              fill="none"
-              viewBox="0 0 24 24"
-            >
-              <circle
-                className="opacity-25"
-                cx="12"
-                cy="12"
-                r="10"
-                stroke="currentColor"
-                strokeWidth="4"
-              />
-              <path
-                className="opacity-75"
-                fill="currentColor"
-                d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
-              />
-            </svg>
+            <Loader2 className="w-5 h-5 animate-spin" />
             Saving...
           </span>
         ) : (
