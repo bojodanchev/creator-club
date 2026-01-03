@@ -6,6 +6,7 @@ import { CommunityProvider } from './core/contexts/CommunityContext';
 
 // Public components
 import LandingPage from './public-pages/LandingPage';
+import MarketingLandingPage from './public-pages/MarketingLandingPage';
 import { LoginPage, SignupPage } from './features/auth';
 import { CommunityLandingPage } from './public-pages/communities/CommunityLandingPage';
 import { CommunitiesDirectory } from './public-pages/communities/CommunitiesDirectory';
@@ -284,6 +285,7 @@ const AppRoutes: React.FC = () => {
     <Routes>
       {/* Public routes */}
       <Route path="/" element={<AuthenticatedRedirect />} />
+      <Route path="/landing" element={<MarketingLandingPage />} />
       <Route path="/explore" element={<CourseCatalogPage />} />
       <Route path="/login" element={<LoginPage />} />
       <Route path="/signup" element={<SignupPage />} />
