@@ -24,10 +24,17 @@ import CourseEditModal from './components/CourseEditModal';
 import ModuleEditModal from './components/ModuleEditModal';
 import LessonEditModal from './components/LessonEditModal';
 import CourseAnalyticsPanel from './components/CourseAnalyticsPanel';
+import CoursePurchaseModal from './components/CoursePurchaseModal';
+import CourseEnrollButton from './components/CourseEnrollButton';
+import { useCourseLimitCheck, UpgradePrompt } from '../billing';
 
 const CourseLMS: React.FC = () => {
-  const { user, role } = useAuth();
+  const { user, profile, role } = useAuth();
   const { selectedCommunity } = useCommunity();
+
+  // Plan limits check for course creation
+  const courseLimit = useCourseLimitCheck();
+  const [showUpgradePrompt, setShowUpgradePrompt] = useState(false);
 
   // State
   const [courses, setCourses] = useState<CourseWithModules[]>([]);
@@ -58,13 +65,16 @@ const CourseLMS: React.FC = () => {
   const [editingLesson, setEditingLesson] = useState<DbLesson | null>(null);
   const [lessonForModule, setLessonForModule] = useState<string>('');
 
+  // Course purchase
+  const [purchasingCourse, setPurchasingCourse] = useState<DbCourse | null>(null);
+
   // Load courses on mount and when community changes
   useEffect(() => {
     loadCourses();
-  }, [user, role, selectedCommunity]);
+  }, [user, profile, role, selectedCommunity]);
 
   const loadCourses = async () => {
-    if (!user) return;
+    if (!user || !profile) return;
     setIsLoading(true);
 
     try {
@@ -72,21 +82,23 @@ const CourseLMS: React.FC = () => {
 
       if (role === 'creator' || role === 'superadmin') {
         // Creators see their own courses filtered by selected community
-        const creatorCourses = await getCreatorCourses(user.id);
+        // Use profile.id because courses.creator_id references profiles.id
+        const creatorCourses = await getCreatorCourses(profile!.id);
         // Filter by selected community if one is selected
         const filteredCourses = selectedCommunity
           ? creatorCourses.filter(c => c.community_id === selectedCommunity.id)
           : creatorCourses;
         // Get full details for each course
         for (const course of filteredCourses) {
-          const details = await getCourseWithDetails(course.id, user.id);
+          const details = await getCourseWithDetails(course.id, profile!.id);
           if (details) courseList.push(details);
         }
       } else {
         // Students see enrolled courses
-        courseList = await getEnrolledCourses(user.id);
+        // Use profile.id because enrollments.user_id references profiles.id
+        courseList = await getEnrolledCourses(profile!.id);
         // Also load available courses to enroll in
-        const available = await getAvailableCourses(user.id);
+        const available = await getAvailableCourses(profile!.id);
         setAvailableCourses(available);
       }
 
@@ -99,11 +111,12 @@ const CourseLMS: React.FC = () => {
   };
 
   const handleEnroll = async (courseId: string) => {
-    if (!user) return;
+    if (!user || !profile) return;
     setIsEnrolling(courseId);
 
     try {
-      const enrollment = await enrollInCourse(user.id, courseId);
+      // Use profile.id because enrollments.user_id references profiles.id
+      const enrollment = await enrollInCourse(profile.id, courseId);
       if (enrollment) {
         // Reload courses to show the newly enrolled course
         await loadCourses();
@@ -113,6 +126,17 @@ const CourseLMS: React.FC = () => {
     } finally {
       setIsEnrolling(null);
     }
+  };
+
+  // Handle course purchase (for paid courses)
+  const handlePurchaseCourse = (course: DbCourse) => {
+    setPurchasingCourse(course);
+  };
+
+  const handlePurchaseSuccess = async () => {
+    // Close modal and reload courses
+    setPurchasingCourse(null);
+    await loadCourses();
   };
 
   const handleSelectCourse = (course: CourseWithModules) => {
@@ -126,11 +150,11 @@ const CourseLMS: React.FC = () => {
   };
 
   const handleCreateCourse = async () => {
-    if (!user || !newCourseName.trim()) return;
+    if (!user || !profile || !newCourseName.trim()) return;
 
-    // Pass the selected community ID so students in that community can see the course
+    // Pass the profile ID (not user.id) because courses.creator_id references profiles.id
     const course = await createCourse(
-      user.id,
+      profile.id,
       newCourseName.trim(),
       newCourseDescription.trim() || undefined,
       undefined, // thumbnailUrl
@@ -145,20 +169,31 @@ const CourseLMS: React.FC = () => {
     }
   };
 
+  // Handler for opening the create course modal with limit check
+  const handleOpenCreateCourse = () => {
+    // Check if creator has reached their course limit
+    if (!courseLimit.allowed) {
+      setShowUpgradePrompt(true);
+      return;
+    }
+    setShowCreateCourse(true);
+  };
+
   const handleToggleComplete = async (lesson: LessonWithProgress) => {
-    if (!user) return;
+    if (!user || !profile) return;
 
     setIsUpdating(true);
     try {
+      // Use profile.id because lesson_progress.user_id references profiles.id
       if (lesson.is_completed) {
-        await markLessonIncomplete(user.id, lesson.id);
+        await markLessonIncomplete(profile.id, lesson.id);
       } else {
-        await markLessonComplete(user.id, lesson.id);
+        await markLessonComplete(profile.id, lesson.id);
       }
 
       // Reload the course to get updated progress
       if (selectedCourse) {
-        const updated = await getCourseWithDetails(selectedCourse.id, user.id);
+        const updated = await getCourseWithDetails(selectedCourse.id, profile.id);
         if (updated) {
           setSelectedCourse(updated);
           // Update the active lesson reference
@@ -336,23 +371,12 @@ const CourseLMS: React.FC = () => {
                 </div>
                 <div className="p-4">
                   <p className="text-slate-600 text-sm line-clamp-2 mb-4">{course.description || 'No description'}</p>
-                  <button
-                    onClick={() => handleEnroll(course.id)}
-                    disabled={isEnrolling === course.id}
-                    className="w-full bg-indigo-600 text-white px-4 py-2 rounded-lg font-medium hover:bg-indigo-700 disabled:opacity-50 flex items-center justify-center gap-2"
-                  >
-                    {isEnrolling === course.id ? (
-                      <>
-                        <Loader2 className="w-4 h-4 animate-spin" />
-                        Enrolling...
-                      </>
-                    ) : (
-                      <>
-                        <Plus size={18} />
-                        Enroll Now
-                      </>
-                    )}
-                  </button>
+                  <CourseEnrollButton
+                    course={course}
+                    isEnrolling={isEnrolling === course.id}
+                    onEnroll={() => handleEnroll(course.id)}
+                    onPurchase={() => handlePurchaseCourse(course)}
+                  />
                 </div>
               </div>
             ))}
@@ -377,7 +401,7 @@ const CourseLMS: React.FC = () => {
           </p>
           {role === 'creator' && (
             <button
-              onClick={() => setShowCreateCourse(true)}
+              onClick={handleOpenCreateCourse}
               className="bg-indigo-600 text-white px-6 py-3 rounded-lg font-medium hover:bg-indigo-700 inline-flex items-center gap-2"
             >
               <Plus size={20} />
@@ -447,7 +471,7 @@ const CourseLMS: React.FC = () => {
           </h1>
           {role === 'creator' && (
             <button
-              onClick={() => setShowCreateCourse(true)}
+              onClick={handleOpenCreateCourse}
               className="bg-indigo-600 text-white px-4 py-2 rounded-lg font-medium hover:bg-indigo-700 inline-flex items-center gap-2"
             >
               <Plus size={18} />
@@ -562,23 +586,12 @@ const CourseLMS: React.FC = () => {
                   </div>
                   <div className="p-4">
                     <p className="text-slate-600 text-sm line-clamp-2 mb-4">{course.description || 'No description'}</p>
-                    <button
-                      onClick={() => handleEnroll(course.id)}
-                      disabled={isEnrolling === course.id}
-                      className="w-full bg-indigo-600 text-white px-4 py-2 rounded-lg font-medium hover:bg-indigo-700 disabled:opacity-50 flex items-center justify-center gap-2"
-                    >
-                      {isEnrolling === course.id ? (
-                        <>
-                          <Loader2 className="w-4 h-4 animate-spin" />
-                          Enrolling...
-                        </>
-                      ) : (
-                        <>
-                          <Plus size={18} />
-                          Enroll Now
-                        </>
-                      )}
-                    </button>
+                    <CourseEnrollButton
+                      course={course}
+                      isEnrolling={isEnrolling === course.id}
+                      onEnroll={() => handleEnroll(course.id)}
+                      onPurchase={() => handlePurchaseCourse(course)}
+                    />
                   </div>
                 </div>
               ))}
@@ -984,6 +997,29 @@ const CourseLMS: React.FC = () => {
           courseName={courses.find(c => c.id === showAnalytics)?.title || 'Course'}
           isOpen={!!showAnalytics}
           onClose={() => setShowAnalytics(null)}
+        />
+      )}
+
+      {/* Upgrade Prompt for Course Limit */}
+      {showUpgradePrompt && (
+        <UpgradePrompt
+          reason="course_limit"
+          onClose={() => setShowUpgradePrompt(false)}
+          currentUsage={{
+            current: courseLimit.current,
+            max: courseLimit.max,
+          }}
+        />
+      )}
+
+      {/* Course Purchase Modal */}
+      {purchasingCourse && user && (
+        <CoursePurchaseModal
+          course={purchasingCourse}
+          isOpen={!!purchasingCourse}
+          onClose={() => setPurchasingCourse(null)}
+          onSuccess={handlePurchaseSuccess}
+          buyerId={user.id}
         />
       )}
     </div>
