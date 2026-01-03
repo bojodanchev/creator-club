@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Heart, MessageSquare, MoreHorizontal, Image as ImageIcon, Smile, Send, Plus, Users, Loader2, Trophy, Star, Zap, Pin, Trash2, Copy, Flag, Edit3, X } from 'lucide-react';
+import { Heart, MessageSquare, MoreHorizontal, Image as ImageIcon, Smile, Send, Plus, Users, Loader2, Trophy, Star, Zap, Pin, Trash2, Copy, Flag, Edit3, X, Settings, GripVertical } from 'lucide-react';
 import { useAuth } from '../../core/contexts/AuthContext';
 import { useCommunity } from '../../core/contexts/CommunityContext';
 import {
@@ -16,6 +16,9 @@ import {
   deletePost,
   togglePinPost,
   uploadPostImage,
+  createChannel,
+  updateChannel,
+  deleteChannel,
 } from './communityService';
 import UserProfilePopup from './UserProfilePopup';
 import {
@@ -65,6 +68,14 @@ const CommunityHub: React.FC<CommunityHubProps> = ({ showCreateModal = false, on
   // Post menu state
   const [openMenuPostId, setOpenMenuPostId] = useState<string | null>(null);
 
+  // Channel management state
+  const [showChannelModal, setShowChannelModal] = useState(false);
+  const [editingChannel, setEditingChannel] = useState<DbCommunityChannel | null>(null);
+  const [channelName, setChannelName] = useState('');
+  const [channelDescription, setChannelDescription] = useState('');
+  const [isSavingChannel, setIsSavingChannel] = useState(false);
+  const [showChannelMenu, setShowChannelMenu] = useState<string | null>(null);
+
   // Image upload and emoji picker state
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [showEmojiPicker, setShowEmojiPicker] = useState(false);
@@ -96,6 +107,15 @@ const CommunityHub: React.FC<CommunityHubProps> = ({ showCreateModal = false, on
       loadPosts(selectedChannel.id);
     }
   }, [selectedChannel]);
+
+  // Close channel menu when clicking outside
+  useEffect(() => {
+    const handleClickOutside = () => setShowChannelMenu(null);
+    if (showChannelMenu) {
+      document.addEventListener('click', handleClickOutside);
+      return () => document.removeEventListener('click', handleClickOutside);
+    }
+  }, [showChannelMenu]);
 
   const loadChannels = async (communityId: string) => {
     const channelList = await getChannels(communityId);
@@ -155,6 +175,83 @@ const CommunityHub: React.FC<CommunityHubProps> = ({ showCreateModal = false, on
     setShowCreateCommunity(false);
     setNewCommunityName('');
     onCloseCreateModal?.();
+  };
+
+  // Channel management handlers
+  const isOwner = profile?.id === selectedCommunity?.creator_id;
+
+  const handleOpenChannelModal = (channel?: DbCommunityChannel) => {
+    if (channel) {
+      setEditingChannel(channel);
+      setChannelName(channel.name);
+      setChannelDescription(channel.description || '');
+    } else {
+      setEditingChannel(null);
+      setChannelName('');
+      setChannelDescription('');
+    }
+    setShowChannelModal(true);
+    setShowChannelMenu(null);
+  };
+
+  const handleCloseChannelModal = () => {
+    setShowChannelModal(false);
+    setEditingChannel(null);
+    setChannelName('');
+    setChannelDescription('');
+  };
+
+  const handleSaveChannel = async () => {
+    if (!selectedCommunity || !channelName.trim()) return;
+
+    setIsSavingChannel(true);
+    try {
+      if (editingChannel) {
+        // Update existing channel
+        const updated = await updateChannel(editingChannel.id, {
+          name: channelName.trim(),
+          description: channelDescription.trim() || undefined,
+        });
+        if (updated) {
+          setChannels(prev => prev.map(c => c.id === updated.id ? updated : c));
+          if (selectedChannel?.id === updated.id) {
+            setSelectedChannel(updated);
+          }
+        }
+      } else {
+        // Create new channel
+        const position = channels.length;
+        const newCh = await createChannel(
+          selectedCommunity.id,
+          channelName.trim(),
+          channelDescription.trim() || undefined,
+          position
+        );
+        if (newCh) {
+          setChannels(prev => [...prev, newCh]);
+        }
+      }
+      handleCloseChannelModal();
+    } finally {
+      setIsSavingChannel(false);
+    }
+  };
+
+  const handleDeleteChannel = async (channelId: string) => {
+    if (!window.confirm('Delete this channel? All posts in this channel will be permanently deleted.')) {
+      return;
+    }
+
+    const success = await deleteChannel(channelId);
+    if (success) {
+      setChannels(prev => prev.filter(c => c.id !== channelId));
+      // If deleted channel was selected, select the first remaining channel
+      if (selectedChannel?.id === channelId) {
+        const remaining = channels.filter(c => c.id !== channelId);
+        setSelectedChannel(remaining[0] || null);
+      }
+    }
+    setShowChannelMenu(null);
   };
 
   const handleCreatePost = async () => {
@@ -520,18 +617,72 @@ const CommunityHub: React.FC<CommunityHubProps> = ({ showCreateModal = false, on
             </div>
           )}
 
-          <h3 className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-4">Channels</h3>
+          <div className="flex items-center justify-between mb-4">
+            <h3 className="text-xs font-bold text-slate-400 uppercase tracking-wider">Channels</h3>
+            {isOwner && (
+              <button
+                onClick={() => handleOpenChannelModal()}
+                className="text-slate-400 hover:text-indigo-600 transition-colors"
+                title="Add channel"
+              >
+                <Plus size={16} />
+              </button>
+            )}
+          </div>
           <div className="space-y-1">
             {channels.map(channel => (
-              <button
+              <div
                 key={channel.id}
-                onClick={() => setSelectedChannel(channel)}
-                className={`w-full text-left px-3 py-2 rounded-lg text-sm font-medium transition-colors
-                  ${selectedChannel?.id === channel.id ? 'bg-indigo-50 text-indigo-700' : 'text-slate-600 hover:bg-slate-50'}
+                className={`group relative flex items-center rounded-lg transition-colors
+                  ${selectedChannel?.id === channel.id ? 'bg-indigo-50' : 'hover:bg-slate-50'}
                 `}
               >
-                # {channel.name.toLowerCase().replace(/ /g, '-')}
-              </button>
+                <button
+                  onClick={() => setSelectedChannel(channel)}
+                  className={`flex-1 text-left px-3 py-2 text-sm font-medium transition-colors
+                    ${selectedChannel?.id === channel.id ? 'text-indigo-700' : 'text-slate-600'}
+                  `}
+                >
+                  # {channel.name.toLowerCase().replace(/ /g, '-')}
+                </button>
+                {isOwner && (
+                  <div className="relative">
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setShowChannelMenu(showChannelMenu === channel.id ? null : channel.id);
+                      }}
+                      className="opacity-0 group-hover:opacity-100 p-1.5 text-slate-400 hover:text-slate-600 transition-all"
+                    >
+                      <MoreHorizontal size={14} />
+                    </button>
+                    {showChannelMenu === channel.id && (
+                      <div className="absolute right-0 top-full mt-1 bg-white rounded-lg shadow-lg border border-slate-200 py-1 z-20 min-w-[120px]">
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleOpenChannelModal(channel);
+                          }}
+                          className="w-full text-left px-3 py-1.5 text-sm text-slate-700 hover:bg-slate-50 flex items-center gap-2"
+                        >
+                          <Edit3 size={14} />
+                          Edit
+                        </button>
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleDeleteChannel(channel.id);
+                          }}
+                          className="w-full text-left px-3 py-1.5 text-sm text-red-600 hover:bg-red-50 flex items-center gap-2"
+                        >
+                          <Trash2 size={14} />
+                          Delete
+                        </button>
+                      </div>
+                    )}
+                  </div>
+                )}
+              </div>
             ))}
           </div>
 
@@ -954,6 +1105,78 @@ const CommunityHub: React.FC<CommunityHubProps> = ({ showCreateModal = false, on
                 className="flex-1 bg-indigo-600 text-white px-4 py-2 rounded-lg hover:bg-indigo-700 disabled:opacity-50"
               >
                 Create
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Channel Create/Edit Modal */}
+      {showChannelModal && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-xl p-6 w-full max-w-md">
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="text-lg font-semibold">
+                {editingChannel ? 'Edit Channel' : 'Create Channel'}
+              </h3>
+              <button
+                onClick={handleCloseChannelModal}
+                className="text-slate-400 hover:text-slate-600"
+              >
+                <X size={20} />
+              </button>
+            </div>
+            <div className="space-y-4">
+              <div>
+                <label className="block text-sm font-medium text-slate-700 mb-1">
+                  Channel Name
+                </label>
+                <input
+                  type="text"
+                  value={channelName}
+                  onChange={(e) => setChannelName(e.target.value)}
+                  placeholder="e.g., General, Announcements"
+                  className="w-full px-4 py-2 border border-slate-200 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
+                  autoFocus
+                />
+                <p className="text-xs text-slate-500 mt-1">
+                  Will display as: # {channelName.toLowerCase().replace(/ /g, '-') || 'channel-name'}
+                </p>
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-slate-700 mb-1">
+                  Description <span className="text-slate-400 font-normal">(optional)</span>
+                </label>
+                <textarea
+                  value={channelDescription}
+                  onChange={(e) => setChannelDescription(e.target.value)}
+                  placeholder="What is this channel for?"
+                  className="w-full px-4 py-2 border border-slate-200 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent resize-none h-20"
+                />
+              </div>
+            </div>
+            <div className="flex gap-3 mt-6">
+              <button
+                onClick={handleCloseChannelModal}
+                className="flex-1 px-4 py-2 border border-slate-200 rounded-lg hover:bg-slate-50"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleSaveChannel}
+                disabled={!channelName.trim() || isSavingChannel}
+                className="flex-1 bg-indigo-600 text-white px-4 py-2 rounded-lg hover:bg-indigo-700 disabled:opacity-50 flex items-center justify-center gap-2"
+              >
+                {isSavingChannel ? (
+                  <>
+                    <Loader2 size={16} className="animate-spin" />
+                    Saving...
+                  </>
+                ) : editingChannel ? (
+                  'Save Changes'
+                ) : (
+                  'Create Channel'
+                )}
               </button>
             </div>
           </div>

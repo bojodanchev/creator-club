@@ -158,6 +158,70 @@ export async function createChannel(
   return data;
 }
 
+export async function updateChannel(
+  channelId: string,
+  updates: { name?: string; description?: string; position?: number }
+): Promise<DbCommunityChannel | null> {
+  const { data, error } = await supabase
+    .from('community_channels')
+    .update(updates)
+    .eq('id', channelId)
+    .select()
+    .single();
+
+  if (error) {
+    console.error('Error updating channel:', error);
+    return null;
+  }
+  return data;
+}
+
+export async function deleteChannel(channelId: string): Promise<boolean> {
+  // First delete all posts in this channel
+  const { error: postsError } = await supabase
+    .from('posts')
+    .delete()
+    .eq('channel_id', channelId);
+
+  if (postsError) {
+    console.error('Error deleting channel posts:', postsError);
+    return false;
+  }
+
+  // Then delete the channel
+  const { error } = await supabase
+    .from('community_channels')
+    .delete()
+    .eq('id', channelId);
+
+  if (error) {
+    console.error('Error deleting channel:', error);
+    return false;
+  }
+  return true;
+}
+
+export async function reorderChannels(
+  channelIds: string[]
+): Promise<boolean> {
+  // Update positions based on array order
+  const updates = channelIds.map((id, index) =>
+    supabase
+      .from('community_channels')
+      .update({ position: index })
+      .eq('id', id)
+  );
+
+  const results = await Promise.all(updates);
+  const hasError = results.some(r => r.error);
+
+  if (hasError) {
+    console.error('Error reordering channels');
+    return false;
+  }
+  return true;
+}
+
 // ============================================================================
 // MEMBERSHIPS
 // ============================================================================
