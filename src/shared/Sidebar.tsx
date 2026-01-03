@@ -84,8 +84,8 @@ const Sidebar: React.FC<SidebarProps> = ({ currentView, setCurrentView, isOpen, 
           </div>
         </div>
 
-        {/* Navigation */}
-        <nav className="flex-1 px-4 py-6 space-y-1 overflow-y-auto">
+        {/* Navigation - Fixed, no scroll */}
+        <nav className="px-4 py-6 space-y-1 shrink-0">
           {getNavItems().map((item) => (
             <button
               key={item.id}
@@ -104,8 +104,10 @@ const Sidebar: React.FC<SidebarProps> = ({ currentView, setCurrentView, isOpen, 
               {item.label}
             </button>
           ))}
+        </nav>
 
-          {/* Community Switcher - Always visible */}
+        {/* Community Switcher - Scrollable section */}
+        <div className="flex-1 min-h-0 overflow-y-auto">
           <CommunitySwitcher
             onBrowseMore={() => {
               if (onBrowseCommunities) {
@@ -122,7 +124,7 @@ const Sidebar: React.FC<SidebarProps> = ({ currentView, setCurrentView, isOpen, 
               setIsOpen(false);
             } : undefined}
           />
-        </nav>
+        </div>
 
         {/* Footer */}
         <div className="p-4 border-t border-slate-800 space-y-2">
