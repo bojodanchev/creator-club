@@ -98,11 +98,27 @@ async function handleCreateAccount(
   supabase: ReturnType<typeof createServiceClient>,
   userId: string
 ): Promise<Response> {
+  // First, get profile using user_id (auth.users.id) NOT profiles.id
+  // This is critical because userId from JWT is auth.users.id
+  const { data: profile, error: profileError } = await supabase
+    .from('profiles')
+    .select('id, email, full_name')
+    .eq('user_id', userId)
+    .single();
+
+  if (profileError || !profile) {
+    console.error('Profile lookup error:', profileError);
+    return errorResponse('Profile not found. Please ensure your profile is set up.');
+  }
+
+  // Use profile.id for creator_billing lookup (FK references profiles.id)
+  const profileId = profile.id;
+
   // Check if account already exists
   const { data: billing } = await supabase
     .from('creator_billing')
     .select('stripe_account_id, stripe_account_status')
-    .eq('creator_id', userId)
+    .eq('creator_id', profileId)
     .single();
 
   if (billing?.stripe_account_id) {
@@ -113,47 +129,59 @@ async function handleCreateAccount(
     });
   }
 
-  // Get creator profile for account details
-  const { data: profile } = await supabase
-    .from('profiles')
-    .select('email, full_name')
-    .eq('id', userId)
-    .single();
-
-  if (!profile?.email) {
-    return errorResponse('Profile not found or missing email');
+  if (!profile.email) {
+    return errorResponse('Profile is missing email address');
   }
 
-  // Create Express Connect account
-  const account = await stripe.accounts.create({
-    type: 'express',
-    country: 'BG', // Bulgaria - adjust based on creator's country
-    email: profile.email,
-    capabilities: {
-      card_payments: { requested: true },
-      transfers: { requested: true },
-    },
-    business_type: 'individual',
-    metadata: {
-      creator_id: userId,
-      platform: 'creator_club',
-    },
-  });
+  try {
+    // Create Express Connect account
+    // Note: Using 'DE' (Germany) as Bulgaria may have limited Express support
+    // You can change this to the creator's actual country when supported
+    const account = await stripe.accounts.create({
+      type: 'express',
+      country: 'DE', // Germany - widely supported for Express accounts
+      email: profile.email,
+      capabilities: {
+        card_payments: { requested: true },
+        transfers: { requested: true },
+      },
+      business_type: 'individual',
+      metadata: {
+        creator_id: profileId,
+        platform: 'creator_club',
+      },
+    });
 
-  // Save to database
-  await supabase
-    .from('creator_billing')
-    .update({
-      stripe_account_id: account.id,
-      stripe_account_status: 'pending',
-      updated_at: new Date().toISOString(),
-    })
-    .eq('creator_id', userId);
+    // Save to database using profileId
+    await supabase
+      .from('creator_billing')
+      .update({
+        stripe_account_id: account.id,
+        stripe_account_status: 'pending',
+        updated_at: new Date().toISOString(),
+      })
+      .eq('creator_id', profileId);
 
-  return jsonResponse({
-    accountId: account.id,
-    status: 'pending',
-  });
+    return jsonResponse({
+      accountId: account.id,
+      status: 'pending',
+    });
+  } catch (stripeError: unknown) {
+    // Log and return detailed Stripe error
+    console.error('Stripe Connect account creation error:', stripeError);
+
+    const errorMessage = stripeError instanceof Error
+      ? stripeError.message
+      : 'Failed to create Connect account';
+
+    // Check if it's a Stripe error with more details
+    if (typeof stripeError === 'object' && stripeError !== null && 'type' in stripeError) {
+      const stripeErr = stripeError as { type: string; message: string; code?: string };
+      return errorResponse(`Stripe error: ${stripeErr.message} (${stripeErr.code || stripeErr.type})`);
+    }
+
+    return errorResponse(errorMessage);
+  }
 }
 
 // ============================================================================
@@ -173,11 +201,22 @@ async function handleOnboardingLink(
     return errorResponse('Missing refreshUrl or returnUrl');
   }
 
-  // Get Connect account ID
+  // First get profile.id from auth user_id
+  const { data: profile } = await supabase
+    .from('profiles')
+    .select('id')
+    .eq('user_id', userId)
+    .single();
+
+  if (!profile) {
+    return errorResponse('Profile not found');
+  }
+
+  // Get Connect account ID using profile.id
   const { data: billing } = await supabase
     .from('creator_billing')
     .select('stripe_account_id')
-    .eq('creator_id', userId)
+    .eq('creator_id', profile.id)
     .single();
 
   if (!billing?.stripe_account_id) {
@@ -208,11 +247,22 @@ async function handleDashboardLink(
   supabase: ReturnType<typeof createServiceClient>,
   userId: string
 ): Promise<Response> {
-  // Get Connect account ID
+  // First get profile.id from auth user_id
+  const { data: profile } = await supabase
+    .from('profiles')
+    .select('id')
+    .eq('user_id', userId)
+    .single();
+
+  if (!profile) {
+    return errorResponse('Profile not found');
+  }
+
+  // Get Connect account ID using profile.id
   const { data: billing } = await supabase
     .from('creator_billing')
     .select('stripe_account_id, stripe_account_status')
-    .eq('creator_id', userId)
+    .eq('creator_id', profile.id)
     .single();
 
   if (!billing?.stripe_account_id) {
@@ -241,11 +291,25 @@ async function handleAccountStatus(
   supabase: ReturnType<typeof createServiceClient>,
   userId: string
 ): Promise<Response> {
-  // Get Connect account ID
+  // First get profile.id from auth user_id
+  const { data: profile } = await supabase
+    .from('profiles')
+    .select('id')
+    .eq('user_id', userId)
+    .single();
+
+  if (!profile) {
+    return jsonResponse({
+      hasAccount: false,
+      status: null,
+    });
+  }
+
+  // Get Connect account ID using profile.id
   const { data: billing } = await supabase
     .from('creator_billing')
     .select('stripe_account_id, stripe_account_status')
-    .eq('creator_id', userId)
+    .eq('creator_id', profile.id)
     .single();
 
   if (!billing?.stripe_account_id) {
@@ -265,7 +329,7 @@ async function handleAccountStatus(
       ? 'restricted'
       : 'pending';
 
-  // Update database if status changed
+  // Update database if status changed using profile.id
   if (status !== billing.stripe_account_status) {
     await supabase
       .from('creator_billing')
@@ -273,7 +337,7 @@ async function handleAccountStatus(
         stripe_account_status: status,
         updated_at: new Date().toISOString(),
       })
-      .eq('creator_id', userId);
+      .eq('creator_id', profile.id);
   }
 
   return jsonResponse({
@@ -302,11 +366,22 @@ async function handleDeleteAccount(
   supabase: ReturnType<typeof createServiceClient>,
   userId: string
 ): Promise<Response> {
-  // Get Connect account ID
+  // First get profile.id from auth user_id
+  const { data: profile } = await supabase
+    .from('profiles')
+    .select('id')
+    .eq('user_id', userId)
+    .single();
+
+  if (!profile) {
+    return errorResponse('Profile not found');
+  }
+
+  // Get Connect account ID using profile.id
   const { data: billing } = await supabase
     .from('creator_billing')
     .select('stripe_account_id')
-    .eq('creator_id', userId)
+    .eq('creator_id', profile.id)
     .single();
 
   if (!billing?.stripe_account_id) {
@@ -316,7 +391,7 @@ async function handleDeleteAccount(
   // Delete the account in Stripe
   await stripe.accounts.del(billing.stripe_account_id);
 
-  // Update database
+  // Update database using profile.id
   await supabase
     .from('creator_billing')
     .update({
@@ -324,7 +399,7 @@ async function handleDeleteAccount(
       stripe_account_status: null,
       updated_at: new Date().toISOString(),
     })
-    .eq('creator_id', userId);
+    .eq('creator_id', profile.id);
 
   return jsonResponse({
     success: true,

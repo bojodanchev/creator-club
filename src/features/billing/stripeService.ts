@@ -36,6 +36,24 @@ import {
 } from './stripeTypes';
 
 // ============================================================================
+// VALIDATION HELPERS
+// ============================================================================
+
+/**
+ * Validate that a profile ID is present and non-empty
+ * IMPORTANT: Always pass profile.id from useAuth(), NOT user.id
+ * Database FK columns reference profiles.id, not auth.users.id
+ */
+function validateProfileId(profileId: string | undefined | null, context: string): void {
+  if (!profileId || typeof profileId !== 'string' || profileId.trim() === '') {
+    throw new Error(
+      `Invalid profile ID in ${context}. ` +
+      'Ensure you are passing profile.id from useAuth(), not user.id.'
+    );
+  }
+}
+
+// ============================================================================
 // STRIPE INITIALIZATION
 // ============================================================================
 
@@ -167,6 +185,12 @@ export async function getPlansWithDisplayInfo(): Promise<PlanDisplayInfo[]> {
  * Get creator's current billing state
  */
 export async function getCreatorBilling(creatorId: string): Promise<CreatorBilling | null> {
+  // Validate profile ID before database query
+  if (!creatorId || typeof creatorId !== 'string' || creatorId.trim() === '') {
+    console.error('getCreatorBilling: Invalid creatorId provided');
+    return null;
+  }
+
   const { data, error } = await supabase
     .from('creator_billing')
     .select(`
@@ -199,6 +223,7 @@ export async function isActivationPaid(creatorId: string): Promise<boolean> {
  * Get full billing dashboard data
  */
 export async function getBillingDashboard(creatorId: string): Promise<BillingDashboardData | null> {
+  // Validation handled by getCreatorBilling
   const billing = await getCreatorBilling(creatorId);
   if (!billing || !billing.plan) {
     return null;
@@ -260,6 +285,9 @@ export async function getBillingDashboard(creatorId: string): Promise<BillingDas
  */
 export async function createActivationCheckout(creatorId: string): Promise<CheckoutResult> {
   try {
+    // Validate profile ID before making Edge Function call
+    validateProfileId(creatorId, 'createActivationCheckout');
+
     // Call Edge Function to create checkout session
     const { data, error } = await supabase.functions.invoke('stripe-checkout', {
       body: {
@@ -297,6 +325,9 @@ export async function createPlanSubscription(
   planId: PlanTier
 ): Promise<SubscriptionResult> {
   try {
+    // Validate profile ID before making Edge Function call
+    validateProfileId(creatorId, 'createPlanSubscription');
+
     // Call Edge Function to create subscription checkout
     const { data, error } = await supabase.functions.invoke('stripe-checkout', {
       body: {
@@ -340,6 +371,9 @@ export async function changePlan(
   newPlanId: PlanTier
 ): Promise<PlanChangeResult> {
   try {
+    // Validate profile ID before database/API operations
+    validateProfileId(creatorId, 'changePlan');
+
     const billing = await getCreatorBilling(creatorId);
     if (!billing) {
       return { success: false, error: 'No billing record found' };
@@ -562,6 +596,9 @@ export async function createConnectAccount(
   country: string = 'BG'
 ): Promise<ConnectOnboardingResult> {
   try {
+    // Validate profile ID before making Edge Function call
+    validateProfileId(creatorId, 'createConnectAccount');
+
     // Call Edge Function to create Connect account
     const { data, error } = await supabase.functions.invoke('stripe-connect', {
       body: {
@@ -569,12 +606,14 @@ export async function createConnectAccount(
       },
     });
 
-    if (error) {
-      throw new Error(error.message || 'Failed to create Connect account');
-    }
-
+    // Check for error in response data first (edge function returns JSON error body)
+    // Then check for invoke error (network/auth issues)
     if (data?.error) {
       throw new Error(data.error);
+    }
+
+    if (error) {
+      throw new Error(error.message || 'Failed to create Connect account');
     }
 
     // If account already exists, still return success
@@ -603,6 +642,9 @@ export async function createConnectAccount(
  */
 export async function getConnectOnboardingLink(creatorId: string): Promise<string | null> {
   try {
+    // Validate profile ID before making Edge Function call
+    validateProfileId(creatorId, 'getConnectOnboardingLink');
+
     // Call Edge Function to get onboarding link
     const { data, error } = await supabase.functions.invoke('stripe-connect', {
       body: {
@@ -634,6 +676,9 @@ export async function getConnectAccountStatus(
   creatorId: string
 ): Promise<ConnectAccountStatus | null> {
   try {
+    // Validate profile ID before making Edge Function call
+    validateProfileId(creatorId, 'getConnectAccountStatus');
+
     // Call Edge Function to get account status
     const { data, error } = await supabase.functions.invoke('stripe-connect', {
       body: {
@@ -681,6 +726,10 @@ export async function createSalePaymentIntent(
   product: { type: ProductType; id: string; name: string; price: number }
 ): Promise<PaymentIntentResult> {
   try {
+    // Validate both profile IDs before making Edge Function call
+    validateProfileId(creatorId, 'createSalePaymentIntent (creatorId)');
+    validateProfileId(buyerId, 'createSalePaymentIntent (buyerId)');
+
     // Call Edge Function to create payment intent
     const { data, error } = await supabase.functions.invoke('stripe-checkout', {
       body: {
@@ -725,6 +774,12 @@ export async function createSalePaymentIntent(
  * Called when a creator makes their first successful sale
  */
 export async function handleFirstSale(creatorId: string): Promise<void> {
+  // Validate profile ID before database operations
+  if (!creatorId || typeof creatorId !== 'string' || creatorId.trim() === '') {
+    console.error('handleFirstSale: Invalid creatorId provided');
+    return;
+  }
+
   const billing = await getCreatorBilling(creatorId);
   if (!billing || billing.has_first_sale) {
     return; // Already handled or no billing record

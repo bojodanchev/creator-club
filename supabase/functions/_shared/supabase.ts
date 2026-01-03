@@ -50,18 +50,32 @@ export function createUserClient(authHeader: string): SupabaseClient {
 
 /**
  * Verify JWT token and get user ID
+ *
+ * IMPORTANT: Must extract token and pass it explicitly to getUser(token)
+ * per Supabase docs: https://supabase.com/docs/guides/functions/auth
  */
 export async function getUserFromToken(authHeader: string | null): Promise<{ userId: string } | null> {
   if (!authHeader) {
+    console.error('No auth header provided');
     return null;
   }
 
   try {
+    // Extract the JWT token from "Bearer <token>" format
+    const token = authHeader.replace('Bearer ', '');
+
+    if (!token || token === authHeader) {
+      console.error('Invalid auth header format - expected "Bearer <token>"');
+      return null;
+    }
+
     const client = createUserClient(authHeader);
-    const { data: { user }, error } = await client.auth.getUser();
+
+    // CRITICAL: Pass the token explicitly to getUser() for proper validation
+    const { data: { user }, error } = await client.auth.getUser(token);
 
     if (error || !user) {
-      console.error('Auth error:', error);
+      console.error('Auth error:', error?.message || 'No user returned');
       return null;
     }
 
