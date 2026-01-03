@@ -1,5 +1,5 @@
 import React from 'react';
-import { Users, ArrowRight } from 'lucide-react';
+import { Users, ArrowRight, Gift, CreditCard, Repeat } from 'lucide-react';
 import type { CommunityListItem } from '../../core/types';
 
 interface CommunityCardProps {
@@ -9,6 +9,12 @@ interface CommunityCardProps {
 
 export const CommunityCard: React.FC<CommunityCardProps> = ({ community, onClick }) => {
   const placeholderImage = `https://ui-avatars.com/api/?name=${encodeURIComponent(community.name)}&background=6366f1&color=fff&size=400`;
+
+  const isFree = community.pricing_type === 'free' || community.price_cents === 0;
+  const isMonthly = community.pricing_type === 'monthly';
+  const priceDisplay = isFree
+    ? 'Free'
+    : `€${(community.price_cents / 100).toFixed(2)}${isMonthly ? '/mo' : ''}`;
 
   return (
     <button
@@ -28,6 +34,22 @@ export const CommunityCard: React.FC<CommunityCardProps> = ({ community, onClick
         <div className="absolute bottom-3 left-3 inline-flex items-center gap-1.5 px-2.5 py-1 bg-black/40 backdrop-blur-sm rounded-full text-white text-xs font-medium">
           <Users className="w-3.5 h-3.5" />
           {community.memberCount.toLocaleString()} {community.memberCount === 1 ? 'member' : 'members'}
+        </div>
+
+        {/* Pricing Badge */}
+        <div className={`absolute top-3 right-3 inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-semibold ${
+          isFree
+            ? 'bg-green-500 text-white'
+            : 'bg-white text-slate-900 shadow-sm'
+        }`}>
+          {isFree ? (
+            <Gift className="w-3 h-3" />
+          ) : isMonthly ? (
+            <Repeat className="w-3 h-3" />
+          ) : (
+            <CreditCard className="w-3 h-3" />
+          )}
+          {priceDisplay}
         </div>
       </div>
 

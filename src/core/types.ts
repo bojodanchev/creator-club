@@ -105,6 +105,8 @@ export interface CommunityListItem {
   description: string | null;
   thumbnail_url: string | null;
   memberCount: number;
+  pricing_type: 'free' | 'one_time' | 'monthly';
+  price_cents: number;
   creator: {
     id: string;
     full_name: string;

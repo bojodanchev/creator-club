@@ -694,6 +694,8 @@ export async function getPublicCommunities(): Promise<CommunityListItem[]> {
       name,
       description,
       thumbnail_url,
+      pricing_type,
+      price_cents,
       created_at,
       creator:profiles!creator_id(id, full_name, avatar_url)
     `)
@@ -715,6 +717,8 @@ export async function getPublicCommunities(): Promise<CommunityListItem[]> {
     description: community.description,
     thumbnail_url: community.thumbnail_url,
     memberCount: memberCounts.get(community.id) || 0,
+    pricing_type: community.pricing_type || 'free',
+    price_cents: community.price_cents || 0,
     creator: {
       id: community.creator?.id || '',
       full_name: community.creator?.full_name || 'Unknown',

@@ -8,7 +8,10 @@ import {
   BookOpen,
   Compass,
   ChevronRight,
-  ArrowRight
+  ArrowRight,
+  Gift,
+  CreditCard,
+  Repeat
 } from 'lucide-react';
 import { useAuth } from '../../core/contexts/AuthContext';
 import { getMemberCommunities, getPublicCommunities } from '../community/communityService';
@@ -274,45 +277,70 @@ const StudentHome: React.FC<StudentHomeProps> = ({ onNavigate }) => {
             </div>
           ) : (
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-              {filteredDiscoverCommunities.slice(0, 6).map((community) => (
-                <div
-                  key={community.id}
-                  onClick={() => navigate(`/community/${community.id}`)}
-                  className="bg-white rounded-xl overflow-hidden shadow-sm border border-slate-200 hover:shadow-md hover:border-indigo-200 transition-all cursor-pointer group"
-                >
-                  {community.thumbnail_url ? (
-                    <img
-                      src={community.thumbnail_url}
-                      alt={community.name}
-                      className="w-full h-32 object-cover"
-                    />
-                  ) : (
-                    <div className="w-full h-32 bg-gradient-to-br from-indigo-500 to-purple-600 flex items-center justify-center">
-                      <Users className="w-12 h-12 text-white/80" />
-                    </div>
-                  )}
-                  <div className="p-4">
-                    <div className="flex items-start justify-between">
-                      <div className="flex-1 min-w-0">
-                        <h3 className="font-semibold text-slate-900 truncate">{community.name}</h3>
-                        <p className="text-sm text-slate-500 mt-1">
-                          by {community.creator.full_name}
-                        </p>
+              {filteredDiscoverCommunities.slice(0, 6).map((community) => {
+                const isFree = community.pricing_type === 'free' || community.price_cents === 0;
+                const isMonthly = community.pricing_type === 'monthly';
+                const priceDisplay = isFree
+                  ? 'Free'
+                  : `€${(community.price_cents / 100).toFixed(2)}${isMonthly ? '/mo' : ''}`;
+
+                return (
+                  <div
+                    key={community.id}
+                    onClick={() => navigate(`/community/${community.id}`)}
+                    className="bg-white rounded-xl overflow-hidden shadow-sm border border-slate-200 hover:shadow-md hover:border-indigo-200 transition-all cursor-pointer group"
+                  >
+                    <div className="relative">
+                      {community.thumbnail_url ? (
+                        <img
+                          src={community.thumbnail_url}
+                          alt={community.name}
+                          className="w-full h-32 object-cover"
+                        />
+                      ) : (
+                        <div className="w-full h-32 bg-gradient-to-br from-indigo-500 to-purple-600 flex items-center justify-center">
+                          <Users className="w-12 h-12 text-white/80" />
+                        </div>
+                      )}
+                      {/* Pricing Badge */}
+                      <div className={`absolute top-2 right-2 inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs font-semibold ${
+                        isFree
+                          ? 'bg-green-500 text-white'
+                          : 'bg-white text-slate-900 shadow-sm'
+                      }`}>
+                        {isFree ? (
+                          <Gift className="w-3 h-3" />
+                        ) : isMonthly ? (
+                          <Repeat className="w-3 h-3" />
+                        ) : (
+                          <CreditCard className="w-3 h-3" />
+                        )}
+                        {priceDisplay}
                       </div>
-                      <div className="flex items-center gap-1 text-xs text-slate-500 bg-slate-100 px-2 py-1 rounded-full">
-                        <Users className="w-3 h-3" />
-                        {community.memberCount}
-                      </div>
                     </div>
-                    <p className="text-sm text-slate-600 line-clamp-2 mt-2">
-                      {community.description || 'Join this community to learn and connect'}
-                    </p>
-                    <button className="mt-3 w-full py-2 bg-indigo-50 text-indigo-600 rounded-lg font-medium text-sm hover:bg-indigo-100 transition-colors group-hover:bg-indigo-600 group-hover:text-white">
-                      View Community
-                    </button>
+                    <div className="p-4">
+                      <div className="flex items-start justify-between">
+                        <div className="flex-1 min-w-0">
+                          <h3 className="font-semibold text-slate-900 truncate">{community.name}</h3>
+                          <p className="text-sm text-slate-500 mt-1">
+                            by {community.creator.full_name}
+                          </p>
+                        </div>
+                        <div className="flex items-center gap-1 text-xs text-slate-500 bg-slate-100 px-2 py-1 rounded-full">
+                          <Users className="w-3 h-3" />
+                          {community.memberCount}
+                        </div>
+                      </div>
+                      <p className="text-sm text-slate-600 line-clamp-2 mt-2">
+                        {community.description || 'Join this community to learn and connect'}
+                      </p>
+                      <button className="mt-3 w-full py-2 bg-indigo-50 text-indigo-600 rounded-lg font-medium text-sm hover:bg-indigo-100 transition-colors group-hover:bg-indigo-600 group-hover:text-white">
+                        View Community
+                      </button>
+                    </div>
                   </div>
-                </div>
-              ))}
+                );
+              })}
             </div>
           )}
 
