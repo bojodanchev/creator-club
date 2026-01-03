@@ -1,7 +1,9 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../../core/contexts/AuthContext';
 import { joinCommunity, getMembership } from '../../features/community/communityService';
+import { createCommunityCheckout } from '../../features/community/communityPaymentService';
+import { supabase } from '../../core/supabase/client';
 import { UserPlus, Check, Loader2, ArrowRight } from 'lucide-react';
 
 interface JoinButtonProps {
@@ -24,9 +26,33 @@ export const JoinButton: React.FC<JoinButtonProps> = ({
   const [isJoining, setIsJoining] = useState(false);
   const [isMember, setIsMember] = useState<boolean | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [communityPricing, setCommunityPricing] = useState<{
+    pricing_type: 'free' | 'one_time' | 'monthly';
+    price_cents: number;
+  } | null>(null);
+
+  // Fetch community pricing when component mounts
+  useEffect(() => {
+    const fetchPricing = async () => {
+      const { data, error } = await supabase
+        .from('communities')
+        .select('pricing_type, price_cents')
+        .eq('id', communityId)
+        .single();
+
+      if (!error && data) {
+        setCommunityPricing({
+          pricing_type: data.pricing_type || 'free',
+          price_cents: data.price_cents || 0,
+        });
+      }
+    };
+
+    fetchPricing();
+  }, [communityId]);
 
   // Check membership status when user is authenticated
-  React.useEffect(() => {
+  useEffect(() => {
     const checkMembership = async () => {
       if (!user) {
         setIsMember(null);
@@ -56,7 +82,31 @@ export const JoinButton: React.FC<JoinButtonProps> = ({
       return;
     }
 
-    // Join the community
+    // Check if this is a paid community
+    if (communityPricing?.pricing_type !== 'free' && communityPricing?.price_cents > 0) {
+      // Paid community - redirect to Stripe Checkout
+      setIsJoining(true);
+      try {
+        const result = await createCommunityCheckout({
+          communityId,
+          successUrl: `${window.location.origin}/community/${communityId}?success=true`,
+          cancelUrl: `${window.location.origin}/community/${communityId}?canceled=true`,
+        });
+
+        if (result.success && result.checkoutUrl) {
+          window.location.href = result.checkoutUrl;
+        } else {
+          setError(result.error || 'Failed to create checkout. Please try again.');
+        }
+      } catch (err) {
+        setError('An error occurred. Please try again.');
+      } finally {
+        setIsJoining(false);
+      }
+      return;
+    }
+
+    // Free community - join directly
     setIsJoining(true);
     try {
       const result = await joinCommunity(user.id, communityId);
@@ -111,6 +161,15 @@ export const JoinButton: React.FC<JoinButtonProps> = ({
   const getButtonText = () => {
     if (isJoining) return 'Joining...';
     if (isMember) return 'Go to Community';
+
+    // Show pricing in button text for paid communities
+    if (communityPricing?.pricing_type === 'monthly' && communityPricing?.price_cents > 0) {
+      return `Subscribe - €${(communityPricing.price_cents / 100).toFixed(2)}/mo`;
+    }
+    if (communityPricing?.pricing_type === 'one_time' && communityPricing?.price_cents > 0) {
+      return `Get Access - €${(communityPricing.price_cents / 100).toFixed(2)}`;
+    }
+
     if (user) return 'Join Community';
     return 'Join to Access';
   };

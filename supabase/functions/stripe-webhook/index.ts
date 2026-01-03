@@ -160,6 +160,8 @@ async function processWebhookEvent(
     // Checkout events
     case 'checkout.session.completed':
       await handleCheckoutComplete(supabase, object);
+      // Also handle community checkout
+      await handleCommunityCheckoutComplete(supabase, object);
       break;
 
     // Invoice events
@@ -339,6 +341,13 @@ async function handleSubscriptionUpdated(
   subscription: Record<string, unknown>
 ): Promise<void> {
   const subscriptionId = subscription.id as string;
+  const metadata = subscription.metadata as Record<string, string> | undefined;
+
+  // Check if this is a community subscription
+  if (metadata?.community_id && metadata?.membership_id) {
+    await handleCommunitySubscriptionUpdated(supabase, subscription);
+    return;
+  }
 
   await supabase
     .from('creator_billing')
@@ -357,6 +366,13 @@ async function handleSubscriptionDeleted(
   subscription: Record<string, unknown>
 ): Promise<void> {
   const subscriptionId = subscription.id as string;
+  const metadata = subscription.metadata as Record<string, string> | undefined;
+
+  // Check if this is a community subscription
+  if (metadata?.community_id || metadata?.membership_id) {
+    await handleCommunitySubscriptionDeleted(supabase, subscription);
+    return;
+  }
 
   // Get Starter plan for downgrade
   const { data: starterPlan } = await supabase
@@ -562,4 +578,177 @@ async function handleFirstSale(
   // Note: Monthly fee activation for Pro/Scale will be handled client-side
   // when the creator next visits their dashboard - they'll be prompted to
   // complete subscription checkout
+}
+
+// ============================================================================
+// COMMUNITY ACCESS HANDLERS
+// Handles paid community checkout and subscription events
+// ============================================================================
+
+async function handleCommunityCheckoutComplete(
+  supabase: ReturnType<typeof createServiceClient>,
+  session: Record<string, unknown>
+): Promise<void> {
+  const metadata = session.metadata as Record<string, string> | undefined;
+
+  // Only process community_access type checkouts
+  if (metadata?.type !== 'community_access') {
+    return;
+  }
+
+  const membershipId = metadata.membership_id;
+  const communityId = metadata.community_id;
+  const buyerId = metadata.buyer_id;
+  const creatorId = metadata.creator_id;
+
+  if (!membershipId || !communityId) {
+    console.log('Missing membership_id or community_id in community checkout metadata');
+    return;
+  }
+
+  console.log(`Processing community checkout for membership: ${membershipId}`);
+
+  // 1. Update membership to paid
+  const updateData: Record<string, unknown> = {
+    payment_status: 'paid',
+    paid_at: new Date().toISOString(),
+  };
+
+  // Handle subscription (monthly) vs one-time payment
+  if (session.subscription) {
+    updateData.stripe_subscription_id = session.subscription;
+    // For subscriptions, set expiry to current period end
+    // This will be updated on each renewal
+    const stripe = getStripeClient();
+    try {
+      const subscription = await stripe.subscriptions.retrieve(session.subscription as string);
+      updateData.expires_at = new Date(subscription.current_period_end * 1000).toISOString();
+    } catch (err) {
+      console.error('Error fetching subscription details:', err);
+    }
+  }
+
+  if (session.payment_intent) {
+    updateData.stripe_payment_intent_id = session.payment_intent;
+  }
+
+  await supabase
+    .from('memberships')
+    .update(updateData)
+    .eq('id', membershipId);
+
+  // 2. Update purchase record
+  await supabase
+    .from('community_purchases')
+    .update({
+      status: 'completed',
+      completed_at: new Date().toISOString(),
+      stripe_payment_intent_id: session.payment_intent as string || null,
+      stripe_subscription_id: session.subscription as string || null,
+    })
+    .eq('stripe_checkout_session_id', session.id);
+
+  // 3. Get community info for creator_sales record
+  const { data: community } = await supabase
+    .from('communities')
+    .select('name, price_cents')
+    .eq('id', communityId)
+    .single();
+
+  if (community && creatorId) {
+    // Get creator's plan for platform fee calculation
+    const { data: creatorBilling } = await supabase
+      .from('creator_billing')
+      .select('plan:billing_plans(platform_fee_percent)')
+      .eq('creator_id', creatorId)
+      .single();
+
+    const feePercent = (creatorBilling?.plan as { platform_fee_percent?: number })?.platform_fee_percent || 6.9;
+    const platformFee = Math.round(community.price_cents * (feePercent / 100));
+    const stripeFee = Math.round(community.price_cents * 0.029 + 25); // Estimated
+
+    // Record in creator_sales
+    await supabase
+      .from('creator_sales')
+      .insert({
+        creator_id: creatorId,
+        buyer_id: buyerId || null,
+        product_type: 'membership',
+        product_id: communityId,
+        product_name: community.name,
+        sale_amount_cents: community.price_cents,
+        platform_fee_cents: platformFee,
+        stripe_fee_cents: stripeFee,
+        net_amount_cents: community.price_cents - platformFee,
+        currency: 'EUR',
+        stripe_payment_intent_id: session.payment_intent as string || null,
+        status: 'completed',
+        completed_at: new Date().toISOString(),
+      });
+
+    // 4. Trigger first sale logic for creator
+    await handleFirstSale(supabase, creatorId);
+  }
+
+  console.log(`Community checkout completed: membership ${membershipId} now has paid access`);
+}
+
+async function handleCommunitySubscriptionUpdated(
+  supabase: ReturnType<typeof createServiceClient>,
+  subscription: Record<string, unknown>
+): Promise<void> {
+  const metadata = subscription.metadata as Record<string, string> | undefined;
+  const membershipId = metadata?.membership_id;
+
+  if (!membershipId) {
+    // Try to find membership by subscription ID
+    const { data: membership } = await supabase
+      .from('memberships')
+      .select('id')
+      .eq('stripe_subscription_id', subscription.id)
+      .single();
+
+    if (!membership) {
+      console.log('No membership found for community subscription:', subscription.id);
+      return;
+    }
+  }
+
+  const status = subscription.status as string;
+  const expiresAt = new Date((subscription.current_period_end as number) * 1000).toISOString();
+
+  // Map Stripe status to our payment_status
+  let paymentStatus = 'paid';
+  if (status === 'past_due' || status === 'unpaid') {
+    paymentStatus = 'expired';
+  } else if (status === 'canceled') {
+    paymentStatus = 'canceled';
+  } else if (status !== 'active' && status !== 'trialing') {
+    paymentStatus = 'failed';
+  }
+
+  await supabase
+    .from('memberships')
+    .update({
+      payment_status: paymentStatus,
+      expires_at: expiresAt,
+    })
+    .eq('stripe_subscription_id', subscription.id);
+}
+
+async function handleCommunitySubscriptionDeleted(
+  supabase: ReturnType<typeof createServiceClient>,
+  subscription: Record<string, unknown>
+): Promise<void> {
+  const subscriptionId = subscription.id as string;
+
+  await supabase
+    .from('memberships')
+    .update({
+      payment_status: 'canceled',
+      canceled_at: new Date().toISOString(),
+    })
+    .eq('stripe_subscription_id', subscriptionId);
+
+  console.log(`Community subscription canceled: ${subscriptionId}`);
 }

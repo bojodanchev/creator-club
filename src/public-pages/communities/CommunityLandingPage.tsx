@@ -15,6 +15,9 @@ import {
   AlertCircle,
   ArrowLeft,
   Sparkles,
+  CreditCard,
+  Repeat,
+  Gift,
 } from 'lucide-react';
 
 export const CommunityLandingPage: React.FC = () => {
@@ -331,6 +334,66 @@ export const CommunityLandingPage: React.FC = () => {
                 </p>
               )}
             </div>
+
+            {/* Pricing Card */}
+            {community.pricing_type !== 'free' && community.price_cents > 0 && (
+              <div className="bg-gradient-to-br from-emerald-50 to-teal-50 rounded-xl shadow-sm border border-emerald-200 p-6">
+                <div className="flex items-center gap-2 mb-3">
+                  {community.pricing_type === 'monthly' ? (
+                    <Repeat className="w-5 h-5 text-emerald-600" />
+                  ) : (
+                    <CreditCard className="w-5 h-5 text-emerald-600" />
+                  )}
+                  <h3 className="text-sm font-medium text-emerald-700 uppercase tracking-wide">
+                    {community.pricing_type === 'monthly' ? 'Subscription' : 'One-Time Access'}
+                  </h3>
+                </div>
+                <div className="flex items-baseline gap-1">
+                  <span className="text-3xl font-bold text-slate-900">
+                    €{(community.price_cents / 100).toFixed(2)}
+                  </span>
+                  {community.pricing_type === 'monthly' && (
+                    <span className="text-slate-600">/month</span>
+                  )}
+                </div>
+                <p className="mt-2 text-sm text-slate-600">
+                  {community.pricing_type === 'monthly'
+                    ? 'Cancel anytime. Full access while subscribed.'
+                    : 'Pay once for lifetime access to this community.'}
+                </p>
+                <div className="mt-4">
+                  <JoinButton
+                    communityId={community.id}
+                    communityName={community.name}
+                    size="md"
+                    className="w-full justify-center"
+                  />
+                </div>
+              </div>
+            )}
+
+            {/* Free Community Badge */}
+            {(community.pricing_type === 'free' || community.price_cents === 0) && (
+              <div className="bg-gradient-to-br from-green-50 to-emerald-50 rounded-xl shadow-sm border border-green-200 p-6">
+                <div className="flex items-center gap-2 mb-2">
+                  <Gift className="w-5 h-5 text-green-600" />
+                  <h3 className="text-sm font-medium text-green-700 uppercase tracking-wide">
+                    Free Community
+                  </h3>
+                </div>
+                <p className="text-sm text-slate-600">
+                  Join for free and get instant access to all community content.
+                </p>
+                <div className="mt-4">
+                  <JoinButton
+                    communityId={community.id}
+                    communityName={community.name}
+                    size="md"
+                    className="w-full justify-center"
+                  />
+                </div>
+              </div>
+            )}
 
             {/* Stats Card */}
             <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-6">

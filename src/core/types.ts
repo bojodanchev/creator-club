@@ -146,6 +146,9 @@ export interface CommunityPublicData {
     thumbnail_url: string | null;
     is_public: boolean;
     created_at: string;
+    pricing_type: 'free' | 'one_time' | 'monthly';
+    price_cents: number;
+    currency: string;
   };
   memberCount: number;
   channelPreviews: ChannelPreview[];
