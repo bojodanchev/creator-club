@@ -1,15 +1,27 @@
 # Community Monetization Design
 
 **Date:** 2026-01-03
-**Status:** 📋 PLANNING
+**Status:** 📋 PLANNING → APPROVED
 **Author:** Claude (Architect)
 **Phase:** Phase 2 - Creator Product Sales
+**Approved:** 2026-01-03 (Brainstorming session complete)
 
 ---
 
 ## Overview
 
 This document defines the complete architecture for paid community access. Creators can set pricing (free, one-time, or monthly) for their communities. Students purchase access via Stripe Checkout, with payments automatically split between the platform and creator via Stripe Connect.
+
+### Key Design Decisions (from Brainstorming)
+
+| Decision | Choice | Rationale |
+|----------|--------|-----------|
+| Onboarding approach | Sequential | Clear path: Signup → Plan → Connect → Monetize |
+| Trial creator billing | Optional early start | "Start Subscription Now" button for eager creators |
+| Connect setup timing | Just-in-time | Prompt when creator tries to set a paid price |
+| Pricing options (MVP) | Free, One-time, Monthly | Simple; architecture ready for tiers, annual, trials |
+| Student checkout | Stripe Checkout (redirect) | Consistent with creator billing, battle-tested |
+| Fee model | Transparent split | Student pays listed price, creator sees fee breakdown |
 
 ### Current State
 
@@ -18,8 +30,9 @@ This document defines the complete architecture for paid community access. Creat
 | `communities` table | ❌ No pricing fields |
 | `memberships` table | ❌ No payment tracking |
 | JoinButton component | ❌ Instant free join only |
-| Stripe Connect | ✅ Infrastructure ready |
+| Stripe Connect | ⏳ Platform profile pending verification |
 | Platform fee calculation | ✅ Based on creator plan tier |
+| Billing UI for trial creators | ❌ Shows broken "Manage Payment Method" |
 
 ### Target State
 
@@ -30,6 +43,47 @@ This document defines the complete architecture for paid community access. Creat
 | JoinButton/PaymentButton | ✅ Conditional: free join or Stripe Checkout |
 | Edge Function | ✅ `community-checkout` for payment processing |
 | Creator Settings | ✅ Pricing configuration UI |
+| Billing UI for trial creators | ✅ Hide payment mgmt, show "Start Subscription Now" |
+
+---
+
+## Creator Journey & States
+
+### The Complete Flow
+
+```
+Signup → Free Trial (Starter) → Build Content → Ready to Monetize? → Connect Setup → Set Prices → First Sale → Subscription Activates
+```
+
+### Creator Billing States
+
+| State | Has Connect | Has Subscription | Can Sell | Billing UI |
+|-------|-------------|------------------|----------|------------|
+| Trial (new) | ❌ | ❌ | ❌ | Plan info, upgrade buttons, "Start Subscription Now" |
+| Trial + Connect | ✅ | ❌ | ✅ | Same + Connect status badge |
+| Early Subscriber | ✅ | ✅ | ✅ | Full billing management |
+| Active (post-first-sale) | ✅ | ✅ | ✅ | Full billing management |
+
+### What Triggers What
+
+- **Creator clicks "Set Paid Price"** → If no Connect → "Set up payouts first" modal → Stripe Connect onboarding
+- **Creator clicks "Start Subscription Now"** → Creates Stripe customer → Starts billing immediately (optional, for eager creators)
+- **First student payment received** → If trial → Auto-trigger subscription start
+
+### Billing Settings Page Behavior
+
+**For Trial Creators:**
+- Show current plan info (Starter trial)
+- Show upgrade buttons (Pro/Scale)
+- Show "Start Subscription Now" button (optional early payment)
+- **HIDE** "Manage Payment Method" (no stripe_customer_id exists)
+- Show Connect setup status/CTA
+
+**For Active Subscribers:**
+- Show full billing management
+- Show "Manage Payment Method" button
+- Show invoice history
+- Show plan change/cancel options
 
 ---
 
@@ -1066,37 +1120,53 @@ export async function getCommunityPortalUrl(
 
 ## Implementation Checklist
 
-### Phase 1: Database (Day 1)
+### Blocker: Stripe Connect Platform Profile
+- [ ] Complete Stripe Connect platform profile verification
+- [ ] Verify Express accounts can be created
+
+### Phase 1: Fix Current UI Issues (Pre-Connect)
+- [ ] Hide "Manage Payment Method" for trial creators (no stripe_customer_id)
+- [ ] Add "Start Subscription Now" button for eager trial creators
+- [ ] Show Connect setup status clearly in billing settings
+- [ ] Fix any remaining profile ID vs user ID bugs
+
+### Phase 2: Community Monetization Database
 - [ ] Create migration `013_community_monetization.sql`
 - [ ] Apply migration to Supabase
 - [ ] Update TypeScript types in `communityTypes.ts`
 - [ ] Update `database.types.ts` with new columns
 
-### Phase 2: Edge Functions (Day 2)
+### Phase 3: Edge Functions
 - [ ] Create `community-checkout` Edge Function
-- [ ] Update `stripe-webhook` with community handlers
-- [ ] Create `community-portal` Edge Function (for subscription management)
+- [ ] Update `stripe-webhook` with community payment handlers
+- [ ] Create `community-portal` Edge Function (member subscription management)
 - [ ] Deploy all functions
-- [ ] Test webhook locally with Stripe CLI
+- [ ] Test webhook with Stripe CLI
 
-### Phase 3: Frontend - Creator Settings (Day 3)
+### Phase 4: Frontend - Creator Settings
 - [ ] Create `CommunityPricingSettings` component
-- [ ] Add pricing tab to community settings
+- [ ] Add pricing tab to community settings modal
 - [ ] Create `communityPaymentService.ts`
+- [ ] Add Just-in-time Connect setup prompt when setting paid price
 - [ ] Test pricing update flow
 
-### Phase 4: Frontend - Student Purchase (Day 4)
+### Phase 5: Frontend - Student Purchase
 - [ ] Update `JoinButton` with payment support
 - [ ] Add pricing display to `CommunityLandingPage`
 - [ ] Handle success/cancel return URLs
-- [ ] Add subscription management for members
+- [ ] Add subscription management link for paid members
 
-### Phase 5: Testing & Polish (Day 5)
+### Phase 6: Earnings & Payouts
+- [ ] Creator earnings dashboard component
+- [ ] Payout history (from Stripe Connect)
+- [ ] Fee breakdown visualization
+
+### Phase 7: Testing & Polish
 - [ ] E2E test: Creator sets pricing
 - [ ] E2E test: Student purchases one-time access
 - [ ] E2E test: Student subscribes monthly
 - [ ] E2E test: Student cancels subscription
-- [ ] Verify platform fees are calculated correctly
+- [ ] Verify platform fees calculated correctly
 - [ ] Verify payouts reach creator Connect account
 
 ---
