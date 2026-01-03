@@ -317,7 +317,7 @@ const AppRoutes: React.FC = () => {
       <Route
         path="/dashboard"
         element={
-          <ProtectedRouteWrapper allowedRoles={['creator', 'superadmin']}>
+          <ProtectedRouteWrapper>
             <CommunityProvider>
               <AppLayout />
             </CommunityProvider>
